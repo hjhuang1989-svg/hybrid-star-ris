@@ -24,7 +24,7 @@
 \maketitle
 
 \begin{abstract}
-Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can enlarge the spectral-efficiency (SE) region of fully passive STAR-RISs, yet their energy-efficiency (EE) gains remain poorly understood because three ingredients are usually oversimplified: amplifier-noise injection, control/switching power, and the asymmetric transmission/reflection tasks intrinsic to STAR operation. This paper develops a structured and analytically transparent framework for the EE-SE frontier of hybrid active-passive STAR-RIS. First, we introduce a three-part power model that separates static controller/bias consumption, dynamic state-switching overhead, and communication-side transmit/amplification power. Second, for a sparse active set and side-wise common gains, we derive a closed-form SE-optimal amplification structure and an explicit active-on threshold showing when amplification is beneficial. Third, we characterize the Pareto boundary through an $\epsilon$-constraint formulation with an outer sparse-activation search and an inner closed-form gain/rate-split update. The resulting design rules are protocol-aware and directly reveal how amplifier noise, side-wise power splitting, and hardware overhead reshape the frontier. Numerical results averaged over $30$ channel draws show that, at $12$ bit/s/Hz, the proposed sparse-hybrid design improves EE by about 24.1\%, 62.8\%, and 59.3\% over uniform hybrid, fully active, and passive baselines, respectively, while remaining feasible up to $20$ bit/s/Hz under the considered budget. The main outcome is a transferable answer to when active elements should be turned on, how many should be activated, and how much gain they should use.
+Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can enlarge the spectral-efficiency (SE) region of fully passive STAR-RISs, yet their energy-efficiency (EE) gains remain poorly understood because three ingredients are usually oversimplified: amplifier-noise injection, control/switching power, and the asymmetric transmission/reflection tasks intrinsic to STAR operation. This paper develops a structured and analytically transparent framework for the EE-SE frontier of hybrid active-passive STAR-RIS. First, we introduce a three-part power model that separates static controller/bias consumption, dynamic state-switching overhead, and communication-side transmit/amplification power. Second, for a sparse active set and side-wise common gains, we derive a closed-form SE-optimal amplification structure and an explicit active-on threshold showing when amplification is beneficial. Third, we characterize the Pareto boundary through an $\epsilon$-constraint formulation with an outer sparse-activation search and an inner closed-form gain/rate-split update. The resulting design rules are protocol-aware and directly reveal how amplifier noise, side-wise power splitting, and hardware overhead reshape the frontier. Numerical results averaged over $100$ channel draws show that, at $12$ bit/s/Hz, the proposed sparse-hybrid design improves EE by about 20.5\%, 59.3\%, and 71.2\% over uniform hybrid, fully active, and passive baselines, respectively, while remaining feasible up to $20$ bit/s/Hz under the considered budget. The main outcome is a transferable answer to when active elements should be turned on, how many should be activated, and how much gain they should use.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -43,7 +43,7 @@ To this end, we develop a structured post-ZF equivalent formulation that preserv
     \item We formulate a hybrid active-passive STAR-RIS downlink with transmission-side users and reflection-side users, and we introduce a three-part power model including static controller/bias power, dynamic switching power, and communication-side BS/amplifier power.
     \item For a fixed active set, we derive an equivalent side-wise SINR model. The resulting SE-optimal common amplification factor admits a closed-form expression, and the derivative yields an explicit \emph{active-on threshold} that quantifies when the coherent-gain benefit dominates amplifier-noise injection.
     \item We develop a structured sparse-activation solver whose outer selection, side-aware weighting, closed-form gain update, and target-rate inversion remain analytically consistent with the proposed framework. This yields a low-complexity alternative to mixed-integer nonlinear programming.
-    \item We reveal concrete design rules: passive STAR-RIS is competitive at low SE, sparse hybrid activation is preferable at moderate-to-high SE, the optimal active ratio grows from about 0.14 at $8$ bit/s/Hz to about 0.68 at $20$ bit/s/Hz, and stronger amplifier noise reduces the preferred gains and narrows the EE region.
+    \item We reveal concrete design rules: passive STAR-RIS is competitive at low SE, sparse hybrid activation is preferable at moderate-to-high SE, the optimal active ratio under ES grows from about 0.13 at $8$ bit/s/Hz to about 0.71 at $20$ bit/s/Hz, and stronger amplifier noise reduces the preferred gains and narrows the EE region.
 \end{itemize}
 
 \section{System Model}
@@ -316,7 +316,7 @@ Algorithm \ref{alg:solver} terminates in finitely many steps because both the ac
 where the $N\log N$ term comes from ranking the candidate active elements. If the scalar refinement of Proposition 2 is added, only a multiplicative factor proportional to the 1-D search depth appears.
 
 \section{Numerical Results}
-We consider a hybrid STAR-RIS with $N=24$ elements, $K_t=K_r=2$, Nakagami-$m$ fading, and the normalized power parameters listed in Table \ref{tab:params}. All curves are averaged over $30$ independent channel draws. All figures are generated by the same simulation pipeline. Unless stated otherwise, the BS transmit-power budget is $0.8$ W, the ES coefficients are $\rho_t=0.55$ and $\rho_r=0.45$, the TS slot fractions are $\tau_t=0.55$ and $\tau_r=0.45$, and the gain cap is $\beta_{\max}=5$.
+We consider a hybrid STAR-RIS with $N=24$ elements, $K_t=K_r=2$, Nakagami-$m$ fading, and the normalized power parameters listed in Table \ref{tab:params}. All curves are averaged over $100$ independent channel draws. All figures are generated by the same simulation pipeline. Unless stated otherwise, the BS transmit-power budget is $5.0$ W, the ES coefficients are $\rho_t=0.55$ and $\rho_r=0.45$, the TS slot fractions are $\tau_t=0.55$ and $\tau_r=0.45$, and the gain cap is $\beta_{\max}=5$.
 
 \begin{table}[t]
 \caption{Simulation Parameters}
@@ -335,18 +335,18 @@ ES coefficients $(\rho_t,\rho_r)$ & $(0.55,0.45)$ \\
 TS slot fractions $(\tau_t,\tau_r)$ & $(0.55,0.45)$ \\
 Noise std. $(\sigma_0,\sigma_a)$ & $(0.26,0.05)$ \\
 Maximum active gain $\beta_{\max}$ & $5$ \\
-BS power budget $P_{\max}^{\mathrm{BS}}$ & $0.8$ W \\
+BS power budget $P_{\max}^{\mathrm{BS}}$ & $5.0$ W \\
 Static controller power $P_{\mathrm{ctrl}}$ & $0.12$ W \\
 Bias power $P_{\mathrm{bias}}$ & $0.004$ W/element \\
 Dynamic base/slope $(P_{\mathrm{sw},0},P_{\mathrm{sw},1})$ & $(0.01,0.0015)$ W \\
 Amplifier coefficient $\mu_t=\mu_r$ & $0.0025$ W \\
 PA efficiency $\eta_{\mathrm{PA}}$ & $0.38$ \\
-Monte Carlo trials & $30$ \\
+Monte Carlo trials & $100$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Fig. \ref{fig:pareto} shows the EE-SE Pareto frontier. At very low SE, the passive STAR-RIS is competitive because no active hardware is needed. As the target SE increases, however, the passive design quickly becomes transmit-power limited. The proposed sparse-hybrid design dominates the whole practical medium-to-high SE region and stays feasible up to $20$ bit/s/Hz, whereas the passive benchmark loses feasibility beyond $12$ bit/s/Hz under the same budget. At $12$ bit/s/Hz, the proposed design improves EE by approximately 24.1\% over uniform hybrid activation, 62.8\% over the fully active design, and 59.3\% over the passive design. This validates the main message of the paper: only a minority of carefully chosen active elements is needed to unlock most of the SE gain.
+Fig. \ref{fig:pareto} shows the EE-SE Pareto frontier. At very low SE, the passive STAR-RIS remains competitive because no active hardware is needed, and at $2$ bit/s/Hz it is nearly coincident with the proposed sparse-hybrid design. As the target SE increases, however, the passive benchmark suffers a rapidly growing BS-power burden, while the fully active benchmark pays a large amplification cost. The proposed sparse-hybrid design dominates the medium-to-high SE region and stays feasible up to $20$ bit/s/Hz under the considered budget. At $12$ bit/s/Hz, the proposed design improves EE by approximately 20.5\% over uniform hybrid activation, 59.3\% over the fully active design, and 71.2\% over the passive design. This again validates the main message of the paper: only a minority of carefully chosen active elements is needed to unlock most of the SE gain.
 
 \begin{figure}[t]
 \centering
@@ -355,7 +355,7 @@ Fig. \ref{fig:pareto} shows the EE-SE Pareto frontier. At very low SE, the passi
 \label{fig:pareto}
 \end{figure}
 
-Fig. \ref{fig:design} compares the protocol-dependent design rules of the proposed sparse-hybrid solver. TS requires the densest active set because the effective slot targets are inflated by $1/\tau_s$; at $12$ bit/s/Hz its active ratio is about $0.66$, versus about $0.30$ for ES and $0.32$ for SS. ES stays between the two extremes, whereas SS tracks ES at medium and high SE while avoiding the severe TS slot penalty. The gain curves follow the same regime split: TS reaches the gain cap earlier, while ES and SS approach saturation more gradually and become nearly coincident once the high-SE regime dominates.
+Fig. \ref{fig:design} compares the protocol-dependent design rules of the proposed sparse-hybrid solver. TS requires the densest active set because the effective slot targets are inflated by $1/\tau_s$; at $12$ bit/s/Hz its active ratio is about $0.69$, versus about $0.30$ for ES and $0.36$ for SS. ES stays between the two extremes, whereas SS tracks ES more closely than TS over the whole range while avoiding the severe slot-rate penalty. The gain curves follow the same regime split: TS reaches the gain cap earlier, whereas ES and SS increase more gradually before all three protocols saturate near the high-SE end.
 
 \begin{figure*}[t]
 \centering
@@ -373,7 +373,7 @@ Fig. \ref{fig:breakdown} compares the power decomposition at the representative 
 \label{fig:breakdown}
 \end{figure}
 
-Fig. \ref{fig:noise_dyn} compares the hardware sensitivity across ES, TS, and SS at the representative target $R_\Sigma=12$ bit/s/Hz. In Fig. \ref{fig:noise_dyn}(a), the average side-wise gain decreases monotonically with $\sigma_a$ under ES and SS, whereas TS becomes infeasible once $\sigma_a$ exceeds about $0.14$ because the slot-rate inflation already forces a dense active set. Fig. \ref{fig:noise_dyn}(b) shows that increasing the state-update frequency from $50$ Hz to $550$ Hz reduces EE for all three protocols; SS remains the most robust over the whole range, ES follows closely, and TS stays consistently lower because its denser activation pattern magnifies the dynamic-cost penalty.
+Fig. \ref{fig:noise_dyn} compares the hardware sensitivity across ES, TS, and SS at the representative target $R_\Sigma=12$ bit/s/Hz. In Fig. \ref{fig:noise_dyn}(a), the average side-wise gain decreases with $\sigma_a$ for all three protocols, with the strongest drop appearing under TS because the slot-rate inflation already forces a denser active set. ES and SS remain close to the gain cap over a broader noise range, while TS backs off its preferred gain much earlier. Fig. \ref{fig:noise_dyn}(b) shows that increasing the state-update frequency from $50$ Hz to $550$ Hz reduces EE for all three protocols; ES stays slightly above SS over most of the range, and TS stays consistently lower because its denser activation pattern magnifies the dynamic-cost penalty.
 
 \begin{figure*}[t]
 \centering
@@ -402,7 +402,7 @@ C.~Huang, A.~Zappone, G.~C. Alexandropoulos, M.~Debbah, and C.~Yuen,
 
 \bibitem{wu2019irs}
 Q.~Wu and R.~Zhang,
-``Intelligent reflecting surface enhanced wireless network: Joint active and passive beamforming design,''
+``Intelligent reflecting surface enhanced wireless network via joint active and passive beamforming,''
 \emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~11, pp.~5394--5409, Nov.~2019.
 
 \bibitem{tang2020mimo}
@@ -446,7 +446,7 @@ Q.~Zhu, M.~Li, R.~Liu, Y.~Liu, and Q.~Liu,
 \emph{IEEE Trans. Commun.}, vol.~70, no.~11, pp.~7628--7643, Nov.~2022.
 
 \bibitem{peng2023hybrid}
-Q.~Peng, G.~Chen, Q.~Wu, R.~Liu, S.~Ma, and W.~Chen,
+Q.~Peng, Q.~Wu, G.~Chen, R.~Liu, S.~Ma, and W.~Chen,
 ``Hybrid active-passive IRS assisted energy-efficient wireless communication,''
 \emph{IEEE Commun. Lett.}, vol.~27, no.~8, pp.~2202--2206, Aug.~2023.
 
@@ -473,7 +473,7 @@ in \emph{Proc. EUSIPCO}, Helsinki, Finland, 2023, pp.~890--894.
 \bibitem{wang2024practical}
 J.~Wang, W.~Tang, J.~C. Liang, L.~Zhang, J.~Y. Dai, X.~Li, S.~Jin, Q.~Cheng, and T.~J. Cui,
 ``Reconfigurable intelligent surface: Power consumption modeling and practical measurement validation,''
-\emph{IEEE Trans. Commun.}, 2024, doi: 10.1109/TCOMM.2024.3382332.
+\emph{IEEE Trans. Commun.}, vol.~72, no.~9, pp.~5720--5734, Sep.~2024, doi: 10.1109/TCOMM.2024.3382332.
 
 \bibitem{fotock2024active}
 R.~K. Fotock, A.~Zappone, and M.~Di Renzo,
@@ -493,7 +493,7 @@ R.~Song, H.~Yin, X.~Pei, L.~Cao, T.~Yang, X.~Ren, and Y.-W. Liu,
 \bibitem{zhu2025activepassive}
 G.~Zhu, X.~Mu, L.~Guo, A.~Huang, and S.~Xu,
 ``STAR-RIS assisted SWIPT systems: Active or passive?''
-\emph{IEEE Trans. Wireless Commun.}, early access, Sep.~2025, doi: 10.1109/TWC.2025.3611793.
+\emph{IEEE Trans. Wireless Commun.}, vol.~25, pp.~4514--4529, 2026, doi: 10.1109/TWC.2025.3611793.
 
 \bibitem{soleymani2023starurlcc}
 M.~Soleymani, I.~Santamaria, and E.~A. Jorswieck,

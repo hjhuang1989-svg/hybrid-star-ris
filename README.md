@@ -1,20 +1,19 @@
-# Hybrid STAR-RIS submission package
+# Hybrid STAR-RIS
 
-Contents:
-- `paper/hybrid_star_ris_ee_se_submission.tex`: revised LaTeX source
-- `paper/hybrid_star_ris_ee_se_submission.pdf`: compiled PDF
-- `code/hybrid_star_ris_ee_se_repro.py`: reproducible simulator with ES / TS / SS support
-- `results/hybrid_star_ris_results.json`: updated numerical summary
-- `figs/`: final figures used by the paper
-- `CHANGELOG.md`: task-by-task modification record
+Main files:
+- `code/hybrid_star_ris_ee_se_repro.py`
+- `paper/hybrid_star_ris_ee_se_submission.tex`
+- `paper/hybrid_star_ris_ee_se_submission.pdf`
+- `figs/`
+- `results/`
 
-To regenerate the numerical results and figures locally:
+Run the simulation:
 
 ```bash
 python code/hybrid_star_ris_ee_se_repro.py
 ```
 
-To compile the paper:
+Compile the paper:
 
 ```bash
 cd paper
