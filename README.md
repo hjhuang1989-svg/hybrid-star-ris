@@ -2,8 +2,8 @@
 
 Main files:
 - `code/hybrid_star_ris_ee_se_repro.py`
-- `paper/hybrid_star_ris_ee_se_submission.tex`
-- `paper/hybrid_star_ris_ee_se_submission.pdf`
+- `paper/hybrid_star_ris_ee_se_submission0329v2.tex`
+- `paper/hybrid_star_ris_ee_se_submission0329v2.pdf`
 - `figs/`
 - `results/`
 
@@ -17,6 +17,5 @@ Compile the paper:
 
 ```bash
 cd paper
-pdflatex -interaction=nonstopmode hybrid_star_ris_ee_se_submission.tex
-pdflatex -interaction=nonstopmode hybrid_star_ris_ee_se_submission.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error hybrid_star_ris_ee_se_submission0329v2.tex
 ```

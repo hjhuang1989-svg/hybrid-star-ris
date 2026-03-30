@@ -32,8 +32,8 @@ class SimConfig:
     Kt: int = 2
     Kr: int = 2
     fading: str = "nakagami"
-    m_br: float = 1.8
-    m_ru: float = 1.3
+    m_br: float = 1.0
+    m_ru: float = 1.0
     pl_br: float = 0.18
     pl_t: Tuple[float, float] = (0.064, 0.052)
     pl_r: Tuple[float, float] = (0.080, 0.064)
@@ -48,9 +48,9 @@ class SimConfig:
     sigma_amp: float = 0.05
 
     P_ctrl: float = 0.12
-    P_bias: float = 0.004
+    P_bias: float = 0.016
     P_dyn_base: float = 0.01
-    P_dyn_act: float = 0.0015
+    P_dyn_act: float = 0.006
     P_amp: float = 0.0025
     eta_pa: float = 0.38
     Ptx_max: float = 5.0
