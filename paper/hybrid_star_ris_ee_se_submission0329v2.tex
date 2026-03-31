@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE) relative to fully passive architectures, but their energy efficiency (EE) behavior remains insufficiently understood because existing analyses often rely on simplified amplifier-noise models, simplified control and switching power models, and asymmetric task models for the transmission and reflection sides. This paper develops a structured analytical framework for the EE-SE Pareto boundary of hybrid active-passive STAR-RISs. We first introduce a three-part power model that accounts for static controller and bias power, dynamic switching overhead, and communication-side transmit and amplification power. For a sparse active set, we derive a closed-form SE-optimal amplification structure and an active-on threshold that quantifies when amplification benefits outweigh amplifier noise. We then characterize the Pareto boundary via an $\epsilon$-constraint formulation with a low-complexity sparse-activation solver and show that the resulting coefficient rules extend across ES, TS, and SS modes. Numerical results under the simulated settings show that the proposed sparse-hybrid design improves EE over the considered baselines.
+Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE) relative to fully passive architectures, but their energy efficiency (EE) behavior remains insufficiently understood because existing analyses often rely on simplified amplifier-noise models, simplified control and switching power models, and asymmetric task models for the transmission and reflection sides. This paper establishes a tractable analytical framework to characterize the fundamental EE-SE Pareto boundary of hybrid active-passive STAR-RISs. We first introduce a three-part power model that accounts for static controller and bias power, dynamic switching overhead, and communication-side transmit and amplification power. For a sparse active set, we derive a closed-form SE-optimal amplification structure and an active-on threshold that quantifies when amplification benefits outweigh amplifier noise. We then characterize the Pareto boundary via an $\epsilon$-constraint formulation with a low-complexity sparse-activation solver and show that the resulting coefficient rules extend across ES, TS, and SS modes. Numerical results under the simulated settings show that the proposed sparse-hybrid design improves EE over the considered baselines.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -33,7 +33,7 @@ STAR-RIS, active RIS, hybrid active-passive RIS, energy efficiency, spectral eff
 \end{IEEEkeywords}
 
 \section{Introduction}
-Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend passive beam manipulation to simultaneous transmission and reflection, allowing a common surface to serve transmission-side and reflection-side users \cite{liu2021star,mu2022star}. This capability is attractive for asymmetric indoor-outdoor coverage, but purely passive STAR-RIS still suffers from multiplicative path loss.
+Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend passive beam manipulation to simultaneous transmission and reflection, allowing a common surface to serve transmission-side and reflection-side users \cite{liu2021star,mu2022star}. This capability is attractive for asymmetric indoor-outdoor coverage, but purely passive STAR-RIS still suffers from multiplicative path loss \cite{wu2019irs}.
 
 Sparse active elements can mitigate this loss at the price of amplifier noise and hardware power \cite{ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal}. Measurement-driven studies further show that RIS power contains controller/bias and switching terms rather than a single constant \cite{wang2023static,wang2024practical}. These effects are more critical in STAR-RIS because the two sides compete for aperture, power split, and active hardware budget.
 
@@ -43,7 +43,7 @@ Sparse active elements can mitigate this loss at the price of amplifier noise an
 	\caption{\centering The hybrid STAR-RIS-aided wireless system.}
 	\label{fig:system}
 \end{figure}
-Existing hybrid active-passive STAR-RIS studies still provide limited structural guidance on when to activate elements, how many to activate, and how to trade EE against SE across energy splitting (ES), time switching (TS), and space splitting (SS) \cite{vu2025hybridstar,zhu2025activepassive,soleymani2023starurlcc,zhang2024activestarisac}. To address this, we develop an equivalent formulation for hybrid STAR-RIS and derive tractable Pareto-boundary characterizations. The main contributions are as follows.
+However, existing hybrid active-passive STAR-RIS studies still leave one critical architectural question unresolved: under what exact channel and hardware conditions does the SE gain of an active element offset its intrinsic noise and power penalty \cite{vu2025hybridstar}? Related active/passive STAR-RIS studies address neighboring settings such as SWIPT, URLLC, and ISAC \cite{zhu2025activepassive,soleymani2023starurlcc,zhang2024activestarisac}. To answer this question, we develop an equivalent formulation for hybrid STAR-RIS and derive tractable Pareto-boundary characterizations. The main contributions are as follows.
 \begin{itemize}
     \item We formulate a hybrid active-passive STAR-RIS downlink and introduce a three-part power model with BS transmit power, controller/bias power, switching overhead, and amplification power.
     \item For a fixed active set, we derive an equivalent side-wise SINR model, a closed-form SE-optimal common gain, an explicit active-on threshold, and a power-minimizing scalar refinement with a sufficient convexity condition.
@@ -52,7 +52,7 @@ Existing hybrid active-passive STAR-RIS studies still provide limited structural
 
 \section{System Model}
 \subsection{Hybrid active-passive STAR-RIS downlink}
-Consider a BS with $M$ antennas serving $K_t$ users on the transmission side and $K_r$ users on the reflection side via an $N$-element STAR-RIS. Let $\mathcal{K}_t=\{1,\ldots,K_t\}$ and $\mathcal{K}_r=\{1,\ldots,K_r\}$. Under the ES protocol, the $n$th STAR-RIS element uses transmission and reflection coefficients
+Consider a BS with $M$ antennas serving $K_t$ users on the transmission side and $K_r$ users on the reflection side via an $N$-element STAR-RIS. Let $\mathcal{K}_t=\{1,\ldots,K_t\}$ and $\mathcal{K}_r=\{1,\ldots,K_r\}$. Under the ES protocol \cite{mu2022star}, the $n$th STAR-RIS element uses transmission and reflection coefficients
 \begin{equation}
 \theta_{n,s}=\sqrt{\rho_{n,s}}\beta_{n,s}e^{j\phi_{n,s}},\qquad s\in\{t,r\},
 \label{eq:theta}
@@ -66,7 +66,7 @@ y_{s,k}=\mathbf{h}_{s,k}^H\mathbf{\Theta}_s\mathbf{G}
 +\mathbf{h}_{s,k}^H\mathbf{n}_{a,s}+n_{s,k},
 \label{eq:received}
 \end{equation}
-where $\mathbf{\Theta}_s=\mathrm{diag}(\theta_{1,s},\ldots,\theta_{N,s})$, $\mathbf{w}_{s,j}$ is the BS beamformer for user $(s,j)$, $x_{s,j}$ is the unit-power information symbol, $n_{s,k}\sim\mathcal{CN}(0,\sigma_0^2)$ is thermal noise, and $\mathbf{n}_{a,s}$ collects the amplifier noises of the active elements on side $s$. We model
+where $\mathbf{\Theta}_s=\mathrm{diag}(\theta_{1,s},\ldots,\theta_{N,s})$, $\mathbf{w}_{s,j}$ is the BS beamformer for user $(s,j)$, $x_{s,j}$ is the unit-power information symbol, $n_{s,k}\sim\mathcal{CN}(0,\sigma_0^2)$ is thermal noise, and $\mathbf{n}_{a,s}$ collects the amplifier noises of the active elements on side $s$. We model it as \cite{zhang2022signal,ma2023activeee}
 \begin{equation}
 \mathbf{n}_{a,s}\sim\mathcal{CN}(\mathbf{0},\mathbf{C}_{a,s}),\qquad
 \mathbf{C}_{a,s}=\mathrm{diag}(c_{1,s},\ldots,c_{N,s}),
@@ -99,7 +99,7 @@ P_{\mathrm{tot}}
 where the terms represent BS transmit power, controller and bias power, switching overhead, and amplification power.
 
 \subsection{Structured equivalent formulation}
-To obtain interpretable structure, we use a equivalent model with side-wise zero-forcing directions, phase alignment on the dominant cascaded paths, and a common gain $\beta_s$ for all active elements on side $s$. Let $g_n$ be the effective BS-to-element channel after zero-forcing projection, and let $h_{s,k,n}$ be the $n$th entry of $\mathbf{h}_{s,k}$. Define the equivalent coherent-gain quantity
+To reveal the underlying structural properties, we introduce an equivalent formulation incorporating side-wise zero-forcing directions, phase alignment on the dominant cascaded paths, and a common gain $\beta_s$ for all active elements on side $s$. Let $g_n$ be the effective BS-to-element channel after zero-forcing projection, and let $h_{s,k,n}$ be the $n$th entry of $\mathbf{h}_{s,k}$. Define the equivalent coherent-gain quantity
 \begin{equation}
 u_{s,k,n} = |g_n|\,|h_{s,k,n}|.
 \label{eq:un}
@@ -301,7 +301,7 @@ For TS, $\mathcal{P}_s^{(\mathrm{TS})}=\{1,\ldots,N\}\setminus\mathcal{A}_s$ and
 
 \section{Sparse-Activation Pareto Boundary Algorithm}
 \subsection{Outer sparse active-element selection}
-The threshold law suggests activating elements with large coherent gain and small noise/hardware cost. For a candidate element $n\notin\mathcal{A}_s$, introduce a relaxed inclusion variable $x_{n,s}\in[0,1]$. For fixed $R_s$, $\beta_s$, and current aggregates $(a_s,b_s,c_s,d_s)$, define
+Motivated by the analytical insights from the active-on threshold in \eqref{eq:threshold}, we propose a heuristic sparse-activation strategy that prioritizes elements offering a high ratio of coherent signal gain to noise-and-hardware cost. For a candidate element $n\notin\mathcal{A}_s$, introduce a relaxed inclusion variable $x_{n,s}\in[0,1]$. For fixed $R_s$, $\beta_s$, and current aggregates $(a_s,b_s,c_s,d_s)$, define
 \[
 C_s=\frac{K_s(2^{R_s/K_s}-1)}{\eta_{\mathrm{PA}}},\qquad
 \Delta u_{n,s}=\sqrt{\rho_s}|g_n|\min_k|h_{s,k,n}|.
@@ -484,10 +484,10 @@ This paper studied the EE-SE tradeoff of hybrid active-passive STAR-RIS through 
 %``Reconfigurable intelligent surfaces for energy efficiency in wireless communication,''
 %\emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~8, pp.~4157--4170, Aug.~2019.
 %
-%\bibitem{wu2019irs}
-%Q.~Wu and R.~Zhang,
-%``Intelligent reflecting surface enhanced wireless network via joint active and passive beamforming,''
-%\emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~11, pp.~5394--5409, Nov.~2019.
+\bibitem{wu2019irs}
+Q.~Wu and R.~Zhang,
+``Intelligent reflecting surface enhanced wireless network via joint active and passive beamforming,''
+\emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~11, pp.~5394--5409, Nov.~2019.
 
 %\bibitem{tang2020mimo}
 %W.~Tang, M.~Z. Chen, X.~Chen, J.~Y. Dai, Y.~Han, M.~Di Renzo, Y.~Zeng, S.~Jin, Q.~Cheng, and T.~J. Cui,
