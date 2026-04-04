@@ -25,7 +25,7 @@
 \maketitle
 
 \begin{abstract}
-Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE) relative to fully passive architectures, but their energy efficiency (EE) behavior remains insufficiently understood because existing analyses often rely on simplified amplifier-noise models, simplified control and switching power models, and asymmetric task models for the transmission and reflection sides. This paper establishes a tractable analytical framework to characterize the fundamental EE-SE Pareto boundary of hybrid active-passive STAR-RISs. We first introduce a three-part power model that accounts for static controller and bias power, dynamic switching overhead, and communication-side transmit and amplification power. For a sparse active set, we derive a closed-form SE-optimal amplification structure and an active-on threshold that quantifies when amplification benefits outweigh amplifier noise. We then characterize the Pareto boundary via an $\epsilon$-constraint formulation with a low-complexity sparse-activation solver and show that the resulting coefficient rules extend across ES, TS, and SS modes. Numerical results under the simulated settings show that the proposed sparse-hybrid design improves EE over the considered baselines.
+Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE) relative to fully passive architectures. Their energy efficiency (EE) behavior, however, remains insufficiently understood because existing analyses often rely on simplified amplifier-noise models, simplified control and switching power models, or asymmetric task models for the transmission and reflection sides. This paper develops a tractable analytical framework for characterizing the EE-SE Pareto boundary of hybrid active-passive STAR-RISs. We first introduce a three-part power model that accounts for static controller and bias power, dynamic switching overhead, and communication-side transmit and amplification power. For a sparse active set, we derive a closed-form SE-optimal amplification structure and an active-on threshold that quantifies when amplification gains offset amplifier noise. We then characterize the Pareto boundary via an $\epsilon$-constraint formulation with a low-complexity sparse-activation solver and show that the resulting coefficient rules extend across ES, TS, and SS modes. Numerical results for the studied settings show that the proposed sparse-hybrid design improves EE over the baseline schemes.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -33,9 +33,9 @@ STAR-RIS, active RIS, hybrid active-passive RIS, energy efficiency, spectral eff
 \end{IEEEkeywords}
 
 \section{Introduction}
-Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend passive beam manipulation to simultaneous transmission and reflection, allowing a common surface to serve transmission-side and reflection-side users \cite{liu2021star,mu2022star}. This capability is attractive for asymmetric indoor-outdoor coverage, but purely passive STAR-RIS still suffers from multiplicative path loss \cite{wu2019irs}.
+Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend passive beam manipulation to simultaneous transmission and reflection, allowing a common surface to serve transmission-side and reflection-side users \cite{liu2021star,mu2022star}. This capability is attractive for asymmetric indoor-outdoor coverage. However, purely passive STAR-RIS still suffers from multiplicative path loss \cite{wu2019irs}.
 
-Sparse active elements can mitigate this loss at the price of amplifier noise and hardware power \cite{ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal}. Measurement-driven studies further show that RIS power contains controller/bias and switching terms rather than a single constant \cite{wang2023static,wang2024practical}. These effects are more critical in STAR-RIS because the two sides compete for aperture, power split, and active hardware budget.
+Sparse active elements can mitigate this loss at the price of amplifier noise and hardware power \cite{ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal}. Measurement-driven studies further show that RIS power contains controller/bias and switching terms rather than a single constant \cite{wang2023static,wang2024practical}. In STAR-RIS, these effects become more pronounced because the two sides compete for aperture, power split, and active hardware budget.
 
 \begin{figure}[t]
 	\centering
@@ -43,11 +43,11 @@ Sparse active elements can mitigate this loss at the price of amplifier noise an
 	\caption{\centering The hybrid STAR-RIS-aided wireless system.}
 	\label{fig:system}
 \end{figure}
-However, existing hybrid active-passive STAR-RIS studies still leave one critical architectural question unresolved: under what exact channel and hardware conditions does the SE gain of an active element offset its intrinsic noise and power penalty \cite{vu2025hybridstar}? Related active/passive STAR-RIS studies address neighboring settings such as SWIPT, URLLC, and ISAC \cite{zhu2025activepassive,soleymani2023starurlcc,zhang2024activestarisac}. To answer this question, we develop an equivalent formulation for hybrid STAR-RIS and derive tractable Pareto-boundary characterizations. The main contributions are as follows.
+However, existing hybrid active-passive STAR-RIS studies do not clearly specify when the SE gain of an active element offsets its associated noise and power cost under given channel and hardware conditions \cite{vu2025hybridstar}. Related active/passive STAR-RIS studies address neighboring settings such as SWIPT, URLLC, and ISAC \cite{zhu2025activepassive,soleymani2023starurlcc,zhang2024activestarisac}. To address this gap, we develop an equivalent formulation for hybrid STAR-RIS and derive tractable Pareto-boundary characterizations. The main contributions are as follows.
 \begin{itemize}
     \item We formulate a hybrid active-passive STAR-RIS downlink and introduce a three-part power model with BS transmit power, controller/bias power, switching overhead, and amplification power.
     \item For a fixed active set, we derive an equivalent side-wise SINR model, a closed-form SE-optimal common gain, an explicit active-on threshold, and a power-minimizing scalar refinement with a sufficient convexity condition.
-    \item We develop a sparse-activation $\epsilon$-constraint solver consistent with the analytical model and show that its coefficient rules extend across ES, TS, and SS; simulations reveal that passive STAR-RIS is competitive only at low SE, whereas sparse hybrid activation is preferable at moderate-to-high SE.
+    \item We develop a sparse-activation $\epsilon$-constraint solver consistent with the analytical model and show that its coefficient rules extend across ES, TS, and SS. Simulations indicate that passive STAR-RIS is most competitive at low SE, whereas sparse hybrid activation yields higher EE at moderate-to-high SE under the considered settings.
 \end{itemize}
 
 \section{System Model}
@@ -66,7 +66,7 @@ y_{s,k}=\mathbf{h}_{s,k}^H\mathbf{\Theta}_s\mathbf{G}
 +\mathbf{h}_{s,k}^H\mathbf{n}_{a,s}+n_{s,k},
 \label{eq:received}
 \end{equation}
-where $\mathbf{\Theta}_s=\mathrm{diag}(\theta_{1,s},\ldots,\theta_{N,s})$, $\mathbf{w}_{s,j}$ is the BS beamformer for user $(s,j)$, $x_{s,j}$ is the unit-power information symbol, $n_{s,k}\sim\mathcal{CN}(0,\sigma_0^2)$ is thermal noise, and $\mathbf{n}_{a,s}$ collects the amplifier noises of the active elements on side $s$. We model it as \cite{zhang2022signal,ma2023activeee}
+where $\mathbf{\Theta}_s=\mathrm{diag}(\theta_{1,s},\ldots,\theta_{N,s})$, $\mathbf{w}_{s,j}$ is the BS beamformer for user $(s,j)$, $x_{s,j}$ is the unit-power information symbol, and $n_{s,k}\sim\mathcal{CN}(0,\sigma_0^2)$ is thermal noise. The vector $\mathbf{n}_{a,s}$ collects the amplifier noises of the active elements on side $s$, and we model it as \cite{zhang2022signal,ma2023activeee}
 \begin{equation}
 \mathbf{n}_{a,s}\sim\mathcal{CN}(\mathbf{0},\mathbf{C}_{a,s}),\qquad
 \mathbf{C}_{a,s}=\mathrm{diag}(c_{1,s},\ldots,c_{N,s}),
@@ -99,7 +99,7 @@ P_{\mathrm{tot}}
 where the terms represent BS transmit power, controller and bias power, switching overhead, and amplification power.
 
 \subsection{Structured equivalent formulation}
-To reveal the underlying structural properties, we introduce an equivalent formulation incorporating side-wise zero-forcing directions, phase alignment on the dominant cascaded paths, and a common gain $\beta_s$ for all active elements on side $s$. Let $g_n$ be the effective BS-to-element channel after zero-forcing projection, and let $h_{s,k,n}$ be the $n$th entry of $\mathbf{h}_{s,k}$. Define the equivalent coherent-gain quantity
+To reveal the underlying structural properties, we introduce an equivalent formulation with side-wise zero-forcing directions, phase alignment on the dominant cascaded paths, and a common gain $\beta_s$ for all active elements on side $s$. Let $g_n$ be the effective BS-to-element channel after zero-forcing projection, and let $h_{s,k,n}$ be the $n$th entry of $\mathbf{h}_{s,k}$. We define the equivalent coherent-gain quantity
 \begin{equation}
 u_{s,k,n} = |g_n|\,|h_{s,k,n}|.
 \label{eq:un}
@@ -118,7 +118,7 @@ where $\mathcal{P}_s=\{1,\ldots,N\}\setminus\mathcal{A}_s$ contains passive elem
 \sum_{n\in\mathcal{A}_s}|h_{s,k,n}|^2.
 \label{eq:noise_exact}
 \end{equation}
-We further assume equal per-user rate splitting within each side, which captures side-wise asymmetric traffic demands but not arbitrary user-specific QoS.
+We further assume equal per-user rate splitting within each side. This captures side-wise asymmetric traffic demands but not arbitrary user-specific QoS.
 The minimum sum transmit power needed to satisfy a side target rate $R_s$ under equal user-rate splitting is then
 \begin{equation}
 p_s^{\min}(\beta_s)=
@@ -159,7 +159,7 @@ R_{s,k}\ge \bar{R}_{s,k},\ \forall s,k, \\
 \end{aligned}
 \label{eq:P0}
 \end{equation}
-where $\Gamma_{n,s}$ is a maximum noise-injection or hardware-safety limit. Problem \eqref{eq:P0} is highly non-convex because the objective is fractional and the variables remain coupled through beamforming, STAR coefficients, active gains, and active-set selection.
+where $\Gamma_{n,s}$ is a maximum noise-injection or hardware-safety limit. Problem \eqref{eq:P0} is highly non-convex. The fractional objective and the coupling among beamforming, STAR coefficients, active gains, and active-set selection make the problem difficult to solve directly.
 
 To trace the EE-SE Pareto boundary, we adopt the $\epsilon$-constraint formulation
 \begin{equation}
@@ -223,10 +223,10 @@ A direct corollary of \eqref{eq:surrogate_derivative} is the \emph{active-on thr
 \iff \frac{b_s}{a_s}>\frac{d_s}{c_s}.
 \label{eq:threshold}
 \end{equation}
-Equation \eqref{eq:threshold} states when active mode is worthwhile: the coherent-gain increase must exceed the normalized amplifier-noise penalty. At high SNR (small effective $c_s$), the condition becomes harder to satisfy.
+Equation \eqref{eq:threshold} specifies when active amplification is beneficial: the coherent-gain increase must exceed the normalized amplifier-noise penalty. At high SNR (small effective $c_s$), this condition becomes harder to satisfy.
 
 \subsection{Power-minimizing gain and a sufficient convexity condition}
-For a target side rate $R_s$, based on (9) and (16), we define the cost as the minimum BS transmit power meeting the rate target plus the intrinsic power consumed by the active amplifiers:
+For a target side rate $R_s$, we define the cost as the sum of the minimum BS transmit power required to meet the rate target and the intrinsic power consumed by the active amplifiers:
 \begin{equation}
 \Psi_s(\beta_s)=
 \frac{K_s(2^{R_s/K_s}-1)(c_s+d_s\beta_s^2)}{\eta_{\mathrm{PA}}(a_s+b_s\beta_s)^2}
@@ -259,11 +259,11 @@ Assume the mixed case $a_s>0$, $b_s>0$, and $d_s>0$. If
 \frac{a_s^2d_s+3b_s^2c_s}{2a_sb_sd_s},
 \label{eq:convexity_cond}
 \end{equation}
-then $\Psi_s(\beta_s)$ is strictly convex on $[1,\beta_{\max}]$. Consequently, the side-wise power-minimizing gain is unique and can be found by checking the two boundaries and the unique root of \eqref{eq:side_derivative}.
+then $\Psi_s(\beta_s)$ is strictly convex on $[1,\beta_{\max}]$. Consequently, the side-wise power-minimizing gain is unique. It can be found by checking the two boundaries and the unique root of \eqref{eq:side_derivative}.
 \end{proposition}
 
 \begin{IEEEproof}
-Under \eqref{eq:convexity_cond}, the bracketed term in \eqref{eq:side_second} is non-negative on $[1,\beta_{\max}]$ and, being affine in $\beta_s$, can vanish at most once. Hence $\Psi_s''(\beta_s)$ is non-negative everywhere and positive on every nontrivial subinterval, so $\Psi_s'(\beta_s)$ is strictly increasing and $\Psi_s(\beta_s)$ is strictly convex. The unique minimum is attained at an endpoint or at the unique root of \eqref{eq:side_derivative}.
+Under \eqref{eq:convexity_cond}, the bracketed term in \eqref{eq:side_second} is non-negative on $[1,\beta_{\max}]$ and, being affine in $\beta_s$, can vanish at most once. Hence $\Psi_s''(\beta_s)$ is non-negative everywhere and positive on every nontrivial subinterval. Therefore, $\Psi_s'(\beta_s)$ is strictly increasing and $\Psi_s(\beta_s)$ is strictly convex. The unique minimum is attained at an endpoint or at the unique root of \eqref{eq:side_derivative}.
 \end{IEEEproof}
 
 \begin{table}[t]
@@ -278,30 +278,30 @@ Under \eqref{eq:convexity_cond}, the bracketed term in \eqref{eq:side_second} is
 \midrule
 Fully passive & $|\mathcal{A}_s|=0$ & $b_s=d_s=0$; no active gain is to be optimized; set $\beta_s^\star=1$. \\[3pt]
 
-Active-no-benefit degenerate case & $|\mathcal{A}_s|>0$, $a_s>0$, $b_s=0$ & $\Psi_s'(\beta_s)>0$; $\Psi_s(\beta_s)$ is strictly increasing ; set$\beta_s^\star=1$. \\[3pt]
+Active-no-benefit degenerate case & $|\mathcal{A}_s|>0$, $a_s>0$, $b_s=0$ & $\Psi_s'(\beta_s)>0$; $\Psi_s(\beta_s)$ is strictly increasing; set $\beta_s^\star=1$. \\[3pt]
 
-Fully active & $|\mathcal{A}_s|>0$, $a_s=0$, $b_s>0$ & $\Psi_s''(\beta_s)>0$ ; $\Psi_s(\beta_s)$ is strictly convex and admits a unique minimizer. \\[3pt]
+Fully active & $|\mathcal{A}_s|>0$, $a_s=0$, $b_s>0$ & $\Psi_s''(\beta_s)>0$; $\Psi_s(\beta_s)$ is strictly convex and admits a unique minimizer. \\[3pt]
 
 Mixed active-passive & $a_s>0$, $b_s>0$ & If $\beta_{\max}\le \frac{a_s^2d_s+3b_s^2c_s}{2a_sb_sd_s}$, then $\Psi_s(\beta_s)$ is strictly convex on $[1,\beta_{\max}]$ and the minimizer is unique. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-In the numerical study, we therefore set $\beta_s=1$ in the first two cases, solve the strictly convex scalar problem in the fully active case, and use \eqref{eq:beta_closed} with the refinement of Proposition~\ref{prop:convexity} in the mixed case.
+In the numerical study, we therefore set $\beta_s=1$ in the first two cases. We solve the strictly convex scalar problem in the fully active case and use \eqref{eq:beta_closed} with the refinement of Proposition~\ref{prop:convexity} in the mixed case.
 
 \subsection{Extension of the coefficient rules to TS and SS}
-Since ES is already covered by \eqref{eq:abcd}, for $p\in\{\mathrm{TS},\mathrm{SS}\}$ let $\mathcal{P}_s^{(p)}$ and $\mathcal{A}_s^{(p)}$ denote the passive and active support sets. Then
+Since ES is already covered by \eqref{eq:abcd}, for $p\in\{\mathrm{TS},\mathrm{SS}\}$ let $\mathcal{P}_s^{(p)}$ and $\mathcal{A}_s^{(p)}$ denote the passive and active support sets. We then define
 \begin{align*}
 a_s^{(p)} &= \min_k \sum_{n\in\mathcal{P}_s^{(p)}} u_{s,k,n}, &
  b_s^{(p)} &= \min_k \sum_{n\in\mathcal{A}_s^{(p)}} u_{s,k,n},\\
 c_s^{(p)} &= \sigma_0^2, &
 d_s^{(p)} &= \max_k \sigma_a^2 \sum_{n\in\mathcal{A}_s^{(p)}} |h_{s,k,n}|^2.
 \end{align*}
-For TS, $\mathcal{P}_s^{(\mathrm{TS})}=\{1,\ldots,N\}\setminus\mathcal{A}_s$ and the effective target becomes $R_s/\tau_s$; for SS, $\mathcal{P}_s^{(\mathrm{SS})}=\mathcal{S}_s\setminus\mathcal{A}_s$ with $\mathcal{S}_t\cup\mathcal{S}_r=\{1,\ldots,N\}$. Thus \eqref{eq:threshold} applies after replacing $(a_s,b_s,c_s,d_s)$ by $(a_s^{(p)},b_s^{(p)},c_s^{(p)},d_s^{(p)})$.
+For TS, $\mathcal{P}_s^{(\mathrm{TS})}=\{1,\ldots,N\}\setminus\mathcal{A}_s$ and the effective target becomes $R_s/\tau_s$. For SS, $\mathcal{P}_s^{(\mathrm{SS})}=\mathcal{S}_s\setminus\mathcal{A}_s$ with $\mathcal{S}_t\cup\mathcal{S}_r=\{1,\ldots,N\}$. Thus \eqref{eq:threshold} applies after replacing $(a_s,b_s,c_s,d_s)$ by $(a_s^{(p)},b_s^{(p)},c_s^{(p)},d_s^{(p)})$.
 
 \section{Sparse-Activation Pareto Boundary Algorithm}
 \subsection{Outer sparse active-element selection}
-Motivated by the analytical insights from the active-on threshold in \eqref{eq:threshold}, we propose a heuristic sparse-activation strategy that prioritizes elements offering a high ratio of coherent signal gain to noise-and-hardware cost. For a candidate element $n\notin\mathcal{A}_s$, introduce a relaxed inclusion variable $x_{n,s}\in[0,1]$. For fixed $R_s$, $\beta_s$, and current aggregates $(a_s,b_s,c_s,d_s)$, define
+Motivated by the active-on threshold in \eqref{eq:threshold}, we propose a heuristic sparse-activation strategy. It prioritizes elements offering a high ratio of coherent signal gain to noise-and-hardware cost. For a candidate element $n\notin\mathcal{A}_s$, we introduce a relaxed inclusion variable $x_{n,s}\in[0,1]$. For fixed $R_s$, $\beta_s$, and current aggregates $(a_s,b_s,c_s,d_s)$, define
 \[
 C_s=\frac{K_s(2^{R_s/K_s}-1)}{\eta_{\mathrm{PA}}},\qquad
 \Delta u_{n,s}=\sqrt{\rho_s}|g_n|\min_k|h_{s,k,n}|.
@@ -354,10 +354,10 @@ Absorbing $\kappa_{1,s}$ and $\kappa_{2,s}$ into normalized weights yields the p
 +\lambda_2(P_{\mathrm{bias}}+f_uP_{\mathrm{sw},1})},
 \label{eq:score}
 \end{equation}
-where $\omega_s$ reflects the side demand and $\lambda_1,\lambda_2$ absorb the side-wise constants. In the simulations, $\omega_t=\alpha$, $\omega_r=1-\alpha$, $\lambda_1=\sigma_0^{-2}$, and $\lambda_2=(P_{\max}^{\mathrm{BS}})^{-1}$. Candidates are ranked by $\max_s\xi_{n,s}$, assigned to the maximizing side, and then re-evaluated through \eqref{eq:minsidepower}, \eqref{eq:side_cost}, and \eqref{eq:power_model}.
+where $\omega_s$ reflects the side demand and $\lambda_1,\lambda_2$ absorb the side-wise constants. In the simulations, $\omega_t=\alpha$, $\omega_r=1-\alpha$, $\lambda_1=\sigma_0^{-2}$, and $\lambda_2=(P_{\max}^{\mathrm{BS}})^{-1}$. Candidates are ranked by $\max_s\xi_{n,s}$ and assigned to the maximizing side. They are then re-evaluated through \eqref{eq:minsidepower}, \eqref{eq:side_cost}, and \eqref{eq:power_model}.
 
 \subsection{Inner gain and rate-split update}
-For a given active cardinality $L=|\mathcal{A}|$, we search over the 1-D rate split $R_t=\alpha\epsilon$ and $R_r=(1-\alpha)\epsilon$. After updating $\mathcal{A}_t$ and $\mathcal{A}_r$ via \eqref{eq:score}, we compute $(a_s,b_s,c_s,d_s)$ and update $\beta_s$ case by case: set $\beta_s=1$ if $|\mathcal{A}_s|=0$ or $b_s=0$, solve $\min_{\beta_s\in[1,\beta_{\max}]}\Psi_s(\beta_s)$ if $a_s=0$, and otherwise use \eqref{eq:beta_closed} or Proposition~\ref{prop:convexity}. The best feasible $(L,\alpha)$ minimizes \eqref{eq:power_model}.
+For a given active cardinality $L=|\mathcal{A}|$, we search over the 1-D rate split $R_t=\alpha\epsilon$ and $R_r=(1-\alpha)\epsilon$. After updating $\mathcal{A}_t$ and $\mathcal{A}_r$ via \eqref{eq:score}, we compute $(a_s,b_s,c_s,d_s)$ and update $\beta_s$ case by case. We set $\beta_s=1$ if $|\mathcal{A}_s|=0$ or $b_s=0$, solve $\min_{\beta_s\in[1,\beta_{\max}]}\Psi_s(\beta_s)$ if $a_s=0$, and otherwise use \eqref{eq:beta_closed} or Proposition~\ref{prop:convexity}. The best feasible $(L,\alpha)$ minimizes \eqref{eq:power_model}.
 
 \begin{algorithm}[t]
 \caption{Sparse-Activation Solver}
@@ -398,7 +398,7 @@ Algorithm~\ref{alg:solver} terminates in finitely many steps because $\mathcal{L
 where the $N\log N$ term comes from ranking the candidate active elements; adding the scalar refinement of Proposition~\ref{prop:convexity} only introduces a multiplicative 1-D search factor.
 
 \section{Numerical Results}
-We consider a hybrid STAR-RIS with $N=24$ elements, $K_t=K_r=2$, Nakagami-$m$ fading, and the normalized parameters listed in Table~\ref{tab:params}. All curves average $100$ independent channel draws. Unless stated otherwise, the BS power budget is $5.0$ W, the ES coefficients are $\rho_t=0.55$ and $\rho_r=0.45$, the TS slot fractions are $\tau_t=0.55$ and $\tau_r=0.45$, and the gain cap is $\beta_{\max}=5$.
+We consider a hybrid STAR-RIS with $N=24$ elements, $K_t=K_r=2$, Nakagami-$m$ fading, and the normalized parameters listed in Table~\ref{tab:params}. Each curve averages $100$ independent channel draws. Unless stated otherwise, the BS power budget is $5.0$ W. The ES coefficients are $\rho_t=0.55$ and $\rho_r=0.45$, the TS slot fractions are $\tau_t=0.55$ and $\tau_r=0.45$, and the gain cap is $\beta_{\max}=5$.
 
 \begin{table}[t]
 \caption{Simulation parameters}
@@ -428,7 +428,7 @@ Monte Carlo trials & $100$ \\
 \end{tabular}
 \end{table}
 
-Fig.~\ref{fig:pareto} shows the EE-SE Pareto boundary. Passive STAR-RIS is competitive only at very low SE, whereas the fully active benchmark pays excessive amplification cost as the target SE increases. The proposed sparse-hybrid design dominates the medium-to-high-SE region and remains feasible up to $20$ bit/s/Hz. At $12$ bit/s/Hz, it improves EE by approximately 30.7\% over uniform hybrid activation, 74.9\% over the fully active design, and 94.4\% over the passive design.
+Fig.~\ref{fig:pareto} shows the EE-SE Pareto boundary. Passive STAR-RIS is most competitive at very low SE, whereas the fully active benchmark incurs higher amplification cost as the target SE increases. Among the considered schemes, the proposed sparse-hybrid design achieves the highest EE in the medium-to-high-SE region and remains feasible up to $20$ bit/s/Hz. At $12$ bit/s/Hz, the EE gain is approximately 30.7\% over uniform hybrid activation, 74.9\% over the fully active design, and 94.4\% over the passive design.
 
 \refstepcounter{figure}
 \noindent\begin{minipage}{\columnwidth}
@@ -438,7 +438,7 @@ Fig.~\ref{fig:pareto} shows the EE-SE Pareto boundary. Passive STAR-RIS is compe
 \label{fig:pareto}
 \end{minipage}\par\vspace{3pt}
 
-Fig.~\ref{fig:design} compares the cross-mode design implications. TS requires the densest active set because the effective slot targets are inflated by $1/\tau_s$; at $12$ bit/s/Hz its active ratio is about $0.54$, versus about $0.27$ for ES and $0.29$ for SS. SS therefore tracks ES much more closely than TS in activation density. The gain curves show that SS stays near the gain cap, TS also uses high gains but with denser activation, and ES ramps more gradually before saturating.
+Fig.~\ref{fig:design} compares the cross-mode design implications. TS requires the densest active set because the effective slot targets are inflated by $1/\tau_s$. At $12$ bit/s/Hz, its active ratio is about $0.54$, versus about $0.27$ for ES and $0.29$ for SS. SS therefore tracks ES more closely than TS in activation density. The gain curves indicate that SS stays near the gain cap, TS also uses high gains but with denser activation, and ES increases more gradually before saturation.
 
 \refstepcounter{figure}
 \noindent\begin{minipage}{\columnwidth}
@@ -448,7 +448,7 @@ Fig.~\ref{fig:design} compares the cross-mode design implications. TS requires t
 \label{fig:design}
 \end{minipage}\par\vspace{3pt}
 
-Fig.~\ref{fig:noise_dyn} shows the hardware sensitivity across ES, TS, and SS at $R_\Sigma=12$ bit/s/Hz. In Fig.~\ref{fig:noise_dyn}(a), the average side-wise gain decreases with $\sigma_a$ for all three protocols, with the strongest drop under TS because slot-rate inflation already forces denser activation. In Fig.~\ref{fig:noise_dyn}(b), increasing the update frequency from $50$ Hz to $550$ Hz reduces EE for all three protocols; SS stays slightly above ES, whereas TS remains lower because its denser activation pattern magnifies the dynamic-cost penalty. The framework captures side-wise asymmetric rate demands through $(a_s,b_s,d_s)$ and the rate split $\alpha$; heterogeneous user-specific QoS and joint calibration/forwarding extensions are left for future work.
+Fig.~\ref{fig:noise_dyn} shows the hardware sensitivity across ES, TS, and SS at $R_\Sigma=12$ bit/s/Hz. In Fig.~\ref{fig:noise_dyn}(a), the average side-wise gain decreases with $\sigma_a$ for all three protocols. The drop is largest under TS because slot-rate inflation already forces denser activation. In Fig.~\ref{fig:noise_dyn}(b), increasing the update frequency from $50$ Hz to $550$ Hz reduces EE for all three protocols. SS stays slightly above ES, whereas TS remains lower because its denser activation pattern magnifies the dynamic-cost penalty. The framework captures side-wise asymmetric rate demands through $(a_s,b_s,d_s)$ and the rate split $\alpha$. Heterogeneous user-specific QoS and joint calibration/forwarding extensions are left for future work.
 
 \refstepcounter{figure}
 \noindent\begin{minipage}{\columnwidth}
@@ -458,7 +458,7 @@ Fig.~\ref{fig:noise_dyn} shows the hardware sensitivity across ES, TS, and SS at
 \label{fig:noise_dyn}
 \end{minipage}\par\vspace{3pt}
 
-Fig.~\ref{fig:breakdown} compares the ES power decomposition at $R_\Sigma=12$ bit/s/Hz. The fully active design minimizes the BS transmit-power share, about $0.38$ W on average, but pays excessive static/dynamic and amplification costs, with the amplification term alone reaching about $1.44$ W. The passive design avoids amplification but requires about $2.78$ W BS power. The proposed sparse-hybrid scheme achieves the lowest total power, about $1.44$ W versus about $1.91$ W for uniform hybrid, by sharply reducing the BS radiated-power requirement while keeping the amplification term well below the fully active benchmark.
+Fig.~\ref{fig:breakdown} compares the ES power decomposition at $R_\Sigma=12$ bit/s/Hz. The fully active design minimizes the BS transmit-power share, about $0.38$ W on average, but also incurs the largest static/dynamic and amplification costs, with the amplification term alone reaching about $1.44$ W. The passive design avoids amplification but requires about $2.78$ W of BS power. The proposed sparse-hybrid scheme achieves the lowest total power, about $1.44$ W versus about $1.91$ W for uniform hybrid, by reducing the BS radiated-power requirement while keeping the amplification term well below the fully active benchmark.
 
 \refstepcounter{figure}
 \noindent\begin{minipage}{\columnwidth}
@@ -469,7 +469,7 @@ Fig.~\ref{fig:breakdown} compares the ES power decomposition at $R_\Sigma=12$ bi
 \end{minipage}\par\vspace{3pt}
 
 \section{Conclusion}
-This paper studied the EE-SE tradeoff of hybrid active-passive STAR-RIS through a structured Pareto-boundary formulation linking amplifier noise, active-set sparsity, side-wise asymmetry, and hardware power. The analysis yielded a closed-form SE-optimal gain, an active-on threshold, and a sparse-activation rule, and the $\epsilon$-constraint solver translated them into a reproducible boundary generator. Numerical results showed that passive STAR-RIS is competitive only at low SE, whereas sparse hybrid activation is preferable at medium-to-high SE; TS requires denser activation and is more sensitive to amplifier noise than ES and SS, and robust CSI-imperfect or calibration-aware designs remain for future work.
+This paper studied the EE-SE tradeoff of hybrid active-passive STAR-RIS through a structured Pareto-boundary formulation linking amplifier noise, active-set sparsity, side-wise asymmetry, and hardware power. The analysis yielded a closed-form SE-optimal gain, an active-on threshold, and a sparse-activation rule. The $\epsilon$-constraint solver translated these results into a reproducible boundary generator. Numerical results indicated that passive STAR-RIS is most competitive at low SE, whereas sparse hybrid activation yields higher EE at moderate-to-high SE under the considered settings. TS requires denser activation and is more sensitive to amplifier noise than ES and SS. Extending the framework to CSI-imperfect or calibration-aware designs remains future work.
 
 
 \begin{thebibliography}{99}
@@ -495,9 +495,9 @@ Q.~Wu and R.~Zhang,
 %\emph{IEEE J. Sel. Areas Commun.}, vol.~38, no.~11, pp.~2683--2699, Nov.~2020.
 
 \bibitem{liu2021star}
-Y.~Liu, X.~Mu, J.~Xu, D.~Niyato, R.~Schober, Y.~L. Guan, and C.~Yuen,
-``STAR: Simultaneous transmission and reflection for 360-degree coverage by intelligent surfaces,''
-\emph{IEEE Wireless Commun.}, vol.~28, no.~6, pp.~102--109, Dec.~2021.
+Y.~Liu, X.~Mu, J.~Xu, R.~Schober, Y.~Hao, H.~V. Poor, and L.~Hanzo,
+``STAR: Simultaneous transmission and reflection for 360$^\circ$ coverage by intelligent surfaces,''
+\emph{IEEE Wireless Commun.}, vol.~28, no.~6, pp.~102--109, Dec.~2021, doi: 10.1109/MWC.001.2100191.
 
 \bibitem{mu2022star}
 X.~Mu, Y.~Liu, L.~Guo, J.~Lin, and R.~Schober,
@@ -522,7 +522,7 @@ A.~Huang, X.~Mu, L.~Guo, and G.~Zhu,
 \bibitem{zhang2022signal}
 Z.~Zhang, L.~Dai, X.~Chen, C.~Liu, F.~Yang, R.~Schober, and H.~V. Poor,
 ``Active RISs: Signal modeling, asymptotic analysis, and beamforming design,''
-in \emph{Proc. IEEE GLOBECOM}, Rio de Janeiro, Brazil, 2022, pp.~1--6.
+in \emph{Proc. IEEE GLOBECOM}, Rio de Janeiro, Brazil, 2022, pp.~1618--1624, doi: 10.1109/GLOBECOM48099.2022.10001687.
 
 \bibitem{wang2023static}
 J.~Wang, W.~Tang, S.~Jin, X.~Li, and M.~Matthaiou,
