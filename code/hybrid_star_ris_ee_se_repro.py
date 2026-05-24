@@ -7,16 +7,17 @@ Hybrid Active-Passive STAR-RIS"
 
 This implementation evaluates the post-ZF scalar surrogate used in the paper.
 It generates the ES / TS / SS protocol studies, feasibility probabilities,
-baseline ablations, power breakdowns, and normalized EE results reported in
-the manuscript.  The side-assigned fully active baseline uses the same
-power-minimizing gain update as the proposed scheme; a gain-saturated active
-benchmark is intentionally not mixed into the main comparison.
+baseline comparisons, power breakdowns, and rate-dependent hardware-sensitivity
+curves reported in the manuscript. The active baseline uses
+the same power-minimizing gain update as the proposed scheme; a gain-saturated
+active benchmark is intentionally not mixed into the main comparison.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
@@ -24,6 +25,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -41,9 +43,9 @@ class SimConfig:
     fading: str = "nakagami"
     m_br: float = 1.0
     m_ru: float = 1.0
-    pl_br: float = 0.18
-    pl_t: Tuple[float, float] = (0.064, 0.052)
-    pl_r: Tuple[float, float] = (0.080, 0.064)
+    pl_br: float = 0.20
+    pl_t: Tuple[float, float] = (0.060, 0.050)
+    pl_r: Tuple[float, float] = (0.080, 0.060)
 
     rho_t: float = 0.55
     rho_r: float = 0.45
@@ -51,16 +53,16 @@ class SimConfig:
     tau_r: float = 0.45
     beta_max: float = 5.0
 
-    sigma0: float = 0.26
+    sigma0: float = 0.25
     sigma_amp: float = 0.05
 
-    P_ctrl: float = 0.12
-    P_bias: float = 0.016
+    P_ctrl: float = 0.10
+    P_bias: float = 0.015
     f_update: float = 50.0
     E_sw_base: float = 2.0e-4
     E_sw_act: float = 1.2e-4
     P_amp: float = 0.0025
-    eta_pa: float = 0.38
+    eta_pa: float = 0.40
     Ptx_max: float = 5.0
 
     L_uniform: int = 6
@@ -69,8 +71,8 @@ class SimConfig:
     split_grid: Tuple[float, ...] = tuple(np.linspace(0.2, 0.8, 13))
     R_targets: Tuple[int, ...] = tuple(range(2, 22, 2))
 
-    num_mc: int = 100
-    num_workers: int = min(8, os.cpu_count() or 1)
+    num_mc: int = 10000
+    num_workers: int = os.cpu_count() or 1
 
     lambda1: Optional[float] = None
     lambda2: Optional[float] = None
@@ -88,7 +90,35 @@ def eq23_weights(cfg: SimConfig) -> Tuple[float, float]:
     return float(lambda1), float(lambda2)
 
 
-def complex_fading(shape: Sequence[int], fading: str, m: float, omega: float, rng: np.random.Generator) -> np.ndarray:
+def summarize_values(values: Sequence[float]) -> Dict[str, float]:
+    """Return mean, spread, standard error, and 95% CI half-width."""
+
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0:
+        return {"mean": float("nan"), "std": float("nan"), "se": float("nan"), "ci95": float("nan")}
+    std = float(np.std(arr, ddof=1)) if arr.size > 1 else 0.0
+    se = float(std / np.sqrt(arr.size)) if arr.size > 0 else float("nan")
+    return {
+        "mean": float(np.mean(arr)),
+        "std": std,
+        "se": se,
+        "ci95": float(1.959963984540054 * se),
+    }
+
+
+def runtime_environment(cfg: SimConfig) -> Dict[str, object]:
+    """Capture the execution environment used for the reproducibility run."""
+
+    return {
+        "python": sys.version.split()[0],
+        "numpy": np.__version__,
+        "matplotlib": matplotlib.__version__,
+        "num_workers": int(cfg.num_workers),
+        "seed_policy": f"integer seeds 1..{cfg.num_mc}",
+    }
+
+
+def complex_fading(shape: Sequence[int], fading: str, m: float, avg_power: float, rng: np.random.Generator) -> np.ndarray:
     """Generate complex fading coefficients.
 
     Envelope power is sampled from a Gamma distribution and combined with a
@@ -98,7 +128,7 @@ def complex_fading(shape: Sequence[int], fading: str, m: float, omega: float, rn
 
     if fading.lower() == "rayleigh":
         m = 1.0
-    power = rng.gamma(shape=m, scale=omega / m, size=shape)
+    power = rng.gamma(shape=m, scale=avg_power / m, size=shape)
     phase = rng.uniform(0.0, 2.0 * np.pi, size=shape)
     return np.sqrt(power) * np.exp(1j * phase)
 
@@ -129,14 +159,14 @@ def protocol_rho_tau(protocol: str, cfg: SimConfig) -> Tuple[Tuple[float, float]
     raise ValueError(f"Unsupported protocol: {protocol}")
 
 
-def side_demand_weights(alpha: float) -> Tuple[float, float]:
-    """Convert the sum-rate split alpha into side-demand weights."""
+def side_rate_weights(alpha: float) -> Tuple[float, float]:
+    """Convert the sum-rate split alpha into rate-split weights."""
 
     eps = 1e-6
     return float(max(alpha, eps)), float(max(1.0 - alpha, eps))
 
 
-def eq23_side_score(g: np.ndarray, h_side: np.ndarray, omega_s: float, rho_s_eff: float, cfg: SimConfig) -> np.ndarray:
+def eq23_side_score(g: np.ndarray, h_side: np.ndarray, side_weight: float, rho_s_eff: float, cfg: SimConfig) -> np.ndarray:
     """Compute the normalized practical ranking score.
 
     The numerator measures the effective coherent-gain potential for the
@@ -150,7 +180,7 @@ def eq23_side_score(g: np.ndarray, h_side: np.ndarray, omega_s: float, rho_s_eff
     abs_g = np.abs(g)
     min_abs_h = np.min(np.abs(h_side), axis=0)
     mean_abs_h2 = np.mean(np.abs(h_side) ** 2, axis=0)
-    numerator = omega_s * np.sqrt(rho_s_eff) * abs_g * min_abs_h
+    numerator = side_weight * np.sqrt(rho_s_eff) * abs_g * min_abs_h
     denominator = lambda1 * rho_s_eff * (cfg.sigma_amp ** 2) * mean_abs_h2 + lambda2 * (cfg.P_bias + cfg.f_update * cfg.E_sw_act)
     return numerator / (denominator + 1e-12)
 
@@ -164,9 +194,9 @@ def build_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, L: int, a
     """
 
     (rho_t_eff, rho_r_eff), _ = protocol_rho_tau(protocol, cfg)
-    omega_t, omega_r = side_demand_weights(alpha)
-    xi_t = eq23_side_score(g, h_t, omega_t, rho_t_eff, cfg)
-    xi_r = eq23_side_score(g, h_r, omega_r, rho_r_eff, cfg)
+    weight_t, weight_r = side_rate_weights(alpha)
+    xi_t = eq23_side_score(g, h_t, weight_t, rho_t_eff, cfg)
+    xi_r = eq23_side_score(g, h_r, weight_r, rho_r_eff, cfg)
     best_side = np.where(xi_t >= xi_r, 0, 1)
     best_score = np.maximum(xi_t, xi_r)
     selected = np.argsort(-best_score)[:L] if L > 0 else np.array([], dtype=int)
@@ -182,9 +212,9 @@ def build_uniform_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, L
         return np.array([], dtype=int), np.array([], dtype=int)
     idx = np.linspace(0, cfg.N - 1, L, dtype=int)
     (rho_t_eff, rho_r_eff), _ = protocol_rho_tau(protocol, cfg)
-    omega_t, omega_r = side_demand_weights(alpha)
-    xi_t = eq23_side_score(g, h_t, omega_t, rho_t_eff, cfg)
-    xi_r = eq23_side_score(g, h_r, omega_r, rho_r_eff, cfg)
+    weight_t, weight_r = side_rate_weights(alpha)
+    xi_t = eq23_side_score(g, h_t, weight_t, rho_t_eff, cfg)
+    xi_r = eq23_side_score(g, h_r, weight_r, rho_r_eff, cfg)
     best_side = np.where(xi_t[idx] >= xi_r[idx], 0, 1)
     return np.sort(idx[best_side == 0]), np.sort(idx[best_side == 1])
 
@@ -193,17 +223,17 @@ def build_strongest_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray,
     """Build a channel-strength-only greedy baseline.
 
     This baseline uses the same L/alpha grid as the proposed method but ranks
-    elements only by side-demand-weighted coherent gain.  It deliberately
+    elements only by rate-split-weighted coherent gain.  It deliberately
     ignores amplifier-noise, bias, and switching costs.
     """
 
     if L <= 0:
         return np.array([], dtype=int), np.array([], dtype=int)
     (rho_t_eff, rho_r_eff), _ = protocol_rho_tau(protocol, cfg)
-    omega_t, omega_r = side_demand_weights(alpha)
+    weight_t, weight_r = side_rate_weights(alpha)
     abs_g = np.abs(g)
-    pi_t = omega_t * np.sqrt(rho_t_eff) * abs_g * np.min(np.abs(h_t), axis=0)
-    pi_r = omega_r * np.sqrt(rho_r_eff) * abs_g * np.min(np.abs(h_r), axis=0)
+    pi_t = weight_t * np.sqrt(rho_t_eff) * abs_g * np.min(np.abs(h_t), axis=0)
+    pi_r = weight_r * np.sqrt(rho_r_eff) * abs_g * np.min(np.abs(h_r), axis=0)
     best_side = np.where(pi_t >= pi_r, 0, 1)
     selected = np.argsort(-np.maximum(pi_t, pi_r))[:L]
     A_t = np.sort(selected[best_side[selected] == 0])
@@ -242,9 +272,9 @@ def build_random_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, L:
     rng = np.random.default_rng(_random_baseline_seed(g, L, alpha, repeat, protocol))
     selected = np.sort(rng.choice(cfg.N, size=L, replace=False))
     (rho_t_eff, rho_r_eff), _ = protocol_rho_tau(protocol, cfg)
-    omega_t, omega_r = side_demand_weights(alpha)
-    xi_t = eq23_side_score(g, h_t, omega_t, rho_t_eff, cfg)
-    xi_r = eq23_side_score(g, h_r, omega_r, rho_r_eff, cfg)
+    weight_t, weight_r = side_rate_weights(alpha)
+    xi_t = eq23_side_score(g, h_t, weight_t, rho_t_eff, cfg)
+    xi_r = eq23_side_score(g, h_r, weight_r, rho_r_eff, cfg)
     best_side = np.where(xi_t[selected] >= xi_r[selected], 0, 1)
     return np.sort(selected[best_side == 0]), np.sort(selected[best_side == 1])
 
@@ -253,14 +283,14 @@ def build_ss_subsurfaces(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, A_t: n
     """Construct transmission and reflection subsurfaces for the SS protocol.
 
     Under SS, each passive element belongs to only one side.  Non-active
-    elements are therefore assigned according to the side-demand-weighted link
+    elements are therefore assigned according to the rate-split-weighted link
     strength, yielding complete subsurfaces S_t and S_r.
     """
 
     abs_g = np.abs(g)
-    omega_t, omega_r = side_demand_weights(alpha)
-    pi_t = omega_t * abs_g * np.min(np.abs(h_t), axis=0)
-    pi_r = omega_r * abs_g * np.min(np.abs(h_r), axis=0)
+    weight_t, weight_r = side_rate_weights(alpha)
+    pi_t = weight_t * abs_g * np.min(np.abs(h_t), axis=0)
+    pi_r = weight_r * abs_g * np.min(np.abs(h_r), axis=0)
     all_idx = np.arange(len(g))
     active_union = np.union1d(A_t, A_r)
     passive = np.setdiff1d(all_idx, active_union)
@@ -441,6 +471,8 @@ def evaluate_candidate(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, A_t: np.
     returned.
     """
 
+    if np.intersect1d(A_t, A_r).size > 0:
+        raise ValueError("Transmission and reflection active sets must be disjoint.")
     Rt = alpha * Rtarget
     Rr = (1.0 - alpha) * Rtarget
     (rho_t_eff, rho_r_eff), (tau_t, tau_r) = protocol_rho_tau(protocol, cfg)
@@ -463,6 +495,8 @@ def evaluate_candidate(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, A_t: np.
         Rr_eff = Rr
     beta_t = minimize_beta_power(a_t, b_t, c_t, d_t, Rt_eff, cfg.Kt, len(A_t), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
     beta_r = minimize_beta_power(a_r, b_r, c_r, d_r, Rr_eff, cfg.Kr, len(A_r), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
+    if not (1.0 <= beta_t <= cfg.beta_max and 1.0 <= beta_r <= cfg.beta_max):
+        raise ValueError("Optimized gains must remain inside [1, beta_max].")
     P_t = side_required_power(g, h_t, passive_t, A_t, beta_t, Rt_eff, rho_t_eff, cfg.sigma0, cfg.sigma_amp)
     P_r = side_required_power(g, h_r, passive_r, A_r, beta_r, Rr_eff, rho_r_eff, cfg.sigma0, cfg.sigma_amp)
     Ptot, Ptx_avg, Ptx_peak, breakdown = protocol_total_power(P_t, P_r, len(A_t), len(A_r), beta_t, beta_r, cfg, mode)
@@ -514,10 +548,11 @@ def solve_boundary_point(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, Rtarge
                 elif scheme == "strongest":
                     A_t, A_r = build_strongest_active_sets(g, h_t, h_r, L, alpha, cfg, protocol)
                 elif scheme == "proposed":
-                    # The proposed sparse solver evaluates a small ranker pool:
-                    # the cost-aware score and its channel-strength-only
-                    # counterpart.  The final choice is made by the same
-                    # surrogate feasibility and total-power evaluation.
+                    # The proposed sparse solver evaluates two candidate
+                    # ranking rules: the cost-aware score and its
+                    # channel-strength-only counterpart.  The final choice is
+                    # made by the same surrogate feasibility and total-power
+                    # evaluation.
                     candidate_sets = (
                         build_active_sets(g, h_t, h_r, L, alpha, cfg, protocol),
                         build_strongest_active_sets(g, h_t, h_r, L, alpha, cfg, protocol),
@@ -612,13 +647,13 @@ def average_boundary(cfg: SimConfig, protocol: str = "ES", schemes: Tuple[str, .
                 pts.append(None)
                 continue
             keys = ["EE", "Ptx", "Ptx_peak", "Ptot", "L", "Lt", "Lr", "beta_t", "beta_r", "beta_avg", "alpha", "static", "dynamic", "bs", "amp"]
-            entry = {"R": float(R), "protocol": protocol.upper(), "feas_prob": len(feas) / cfg.num_mc}
+            entry = {"R": float(R), "protocol": protocol.upper(), "n_total": int(cfg.num_mc), "n_feasible": int(len(feas)), "feas_prob": len(feas) / cfg.num_mc}
             for key in keys:
-                vals = np.array([r[key] for r in feas], dtype=float)
-                entry[key] = float(np.mean(vals))
-                if key in ("EE", "Ptot"):
-                    entry[f"{key}_std"] = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
-                    entry[f"{key}_se"] = float(entry[f"{key}_std"] / np.sqrt(len(vals))) if len(vals) > 0 else 0.0
+                stats = summarize_values([r[key] for r in feas])
+                entry[key] = stats["mean"]
+                entry[f"{key}_std"] = stats["std"]
+                entry[f"{key}_se"] = stats["se"]
+                entry[f"{key}_ci95"] = stats["ci95"]
             entry["EE_from_mean_power"] = float(R / entry["Ptot"])
             pts.append(entry)
         avg[scheme] = pts
@@ -655,9 +690,23 @@ def sweep_sigma_amp(sigmas: Sequence[float], cfg: SimConfig, Rtarget: float, pro
     out = []
     for sigma_amp, cfg_s, vals in zip(sigmas, cfgs, grouped):
         if vals:
-            out.append({"sigma_amp": float(sigma_amp), "beta_t": float(np.mean([r["beta_t"] for r in vals])), "beta_r": float(np.mean([r["beta_r"] for r in vals])), "beta_avg": float(np.mean([r["beta_avg"] for r in vals])), "active_ratio": float(np.mean([r["L"] / cfg_s.N for r in vals])), "EE": float(np.mean([r["EE"] for r in vals]))})
+            entry = {"sigma_amp": float(sigma_amp), "n_total": int(cfg.num_mc), "n_feasible": int(len(vals)), "feas_prob": float(len(vals) / cfg.num_mc)}
+            series = {
+                "beta_t": [r["beta_t"] for r in vals],
+                "beta_r": [r["beta_r"] for r in vals],
+                "beta_avg": [r["beta_avg"] for r in vals],
+                "active_ratio": [r["L"] / cfg_s.N for r in vals],
+                "EE": [r["EE"] for r in vals],
+            }
+            for key, values in series.items():
+                stats = summarize_values(values)
+                entry[key] = stats["mean"]
+                entry[f"{key}_std"] = stats["std"]
+                entry[f"{key}_se"] = stats["se"]
+                entry[f"{key}_ci95"] = stats["ci95"]
+            out.append(entry)
         else:
-            out.append({"sigma_amp": float(sigma_amp), "beta_t": None, "beta_r": None, "beta_avg": None, "active_ratio": None, "EE": None})
+            out.append({"sigma_amp": float(sigma_amp), "n_total": int(cfg.num_mc), "n_feasible": 0, "feas_prob": 0.0, "beta_t": None, "beta_r": None, "beta_avg": None, "active_ratio": None, "EE": None})
     return out
 
 
@@ -681,9 +730,19 @@ def sweep_update_frequency(f_updates: Sequence[float], cfg: SimConfig, Rtarget: 
     out = []
     for fu, vals in zip(f_updates, grouped):
         if vals:
-            out.append({"f_update": float(fu), "EE": float(np.mean([r["EE"] for r in vals]))})
+            stats = summarize_values([r["EE"] for r in vals])
+            out.append({
+                "f_update": float(fu),
+                "n_total": int(cfg.num_mc),
+                "n_feasible": int(len(vals)),
+                "feas_prob": float(len(vals) / cfg.num_mc),
+                "EE": stats["mean"],
+                "EE_std": stats["std"],
+                "EE_se": stats["se"],
+                "EE_ci95": stats["ci95"],
+            })
         else:
-            out.append({"f_update": float(fu), "EE": None})
+            out.append({"f_update": float(fu), "n_total": int(cfg.num_mc), "n_feasible": 0, "feas_prob": 0.0, "EE": None})
     return out
 
 
@@ -696,15 +755,13 @@ def average_breakdown_for_R(cfg: SimConfig, raw: Dict[str, List[List[Optional[Di
         feas = [r for r in raw[scheme][idx] if r is not None]
         if not feas:
             continue
-        out[scheme] = {
-            "static": float(np.mean([r["static"] for r in feas])),
-            "dynamic": float(np.mean([r["dynamic"] for r in feas])),
-            "bs": float(np.mean([r["bs"] for r in feas])),
-            "amp": float(np.mean([r["amp"] for r in feas])),
-            "Ptot": float(np.mean([r["Ptot"] for r in feas])),
-            "EE": float(np.mean([r["EE"] for r in feas])),
-            "feas_prob": float(len(feas) / cfg.num_mc),
-        }
+        out[scheme] = {"n_total": int(cfg.num_mc), "n_feasible": int(len(feas)), "feas_prob": float(len(feas) / cfg.num_mc)}
+        for key in ("static", "dynamic", "bs", "amp", "Ptot", "EE"):
+            stats = summarize_values([r[key] for r in feas])
+            out[scheme][key] = stats["mean"]
+            out[scheme][f"{key}_std"] = stats["std"]
+            out[scheme][f"{key}_se"] = stats["se"]
+            out[scheme][f"{key}_ci95"] = stats["ci95"]
     return out
 
 
@@ -714,7 +771,7 @@ SCHEME_LABELS = {
     "uniform_opt": "Opt. uniform",
     "random": "Single-random sparse",
     "strongest": "Strongest greedy",
-    "active": "Side-assigned active",
+    "active": "Active",
     "proposed": "Proposed",
 }
 
@@ -769,12 +826,126 @@ def representative_metrics(avg: Dict[str, List[Optional[Dict[str, float]]]], rat
         out[scheme] = {
             "EE_mean": float(match["EE"]),
             "EE_se": float(match.get("EE_se", 0.0)),
+            "EE_ci95": float(match.get("EE_ci95", 0.0)),
             "Ptot_mean": float(match["Ptot"]),
+            "Ptot_se": float(match.get("Ptot_se", 0.0)),
+            "Ptot_ci95": float(match.get("Ptot_ci95", 0.0)),
             "EE_from_mean_power": float(match["EE_from_mean_power"]),
             "active_count": float(match["L"]),
+            "n_feasible": int(match.get("n_feasible", 0)),
+            "n_total": int(match.get("n_total", 0)),
             "feas_prob": float(match["feas_prob"]),
         }
     return out
+
+
+def point_at_rate(points: Sequence[Optional[Dict[str, float]]], rate: int) -> Optional[Dict[str, float]]:
+    """Return the averaged point matching an integer target rate."""
+
+    return next((p for p in points if p is not None and int(round(p["R"])) == int(rate)), None)
+
+
+def validate_raw_outputs(cfg: SimConfig, raw: Dict[str, List[List[Optional[Dict[str, float]]]]], label: str) -> Dict[str, object]:
+    """Validate numerical consistency for raw Monte Carlo samples."""
+
+    checked_total = 0
+    checked_feasible = 0
+    violations: List[str] = []
+    tol = 1e-7
+    numeric_keys = ("EE", "Ptx", "Ptx_peak", "Ptot", "L", "Lt", "Lr", "beta_t", "beta_r", "beta_avg", "alpha", "static", "dynamic", "bs", "amp")
+
+    for scheme, by_rate in raw.items():
+        for rate_idx, samples in enumerate(by_rate):
+            rate = cfg.R_targets[rate_idx]
+            for sample_idx, res in enumerate(samples):
+                checked_total += 1
+                if res is None:
+                    continue
+                checked_feasible += 1
+                prefix = f"{label}:{scheme}:R{rate}:sample{sample_idx + 1}"
+                for key in numeric_keys:
+                    if key in res and not np.isfinite(float(res[key])):
+                        violations.append(f"{prefix}:{key}:nonfinite")
+                if not (1.0 - tol <= res["beta_t"] <= cfg.beta_max + tol and 1.0 - tol <= res["beta_r"] <= cfg.beta_max + tol):
+                    violations.append(f"{prefix}:gain_bounds")
+                if res["Ptx_peak"] > cfg.Ptx_max + tol:
+                    violations.append(f"{prefix}:Ptx_peak_budget")
+                if abs(res["Ptot"] - (res["static"] + res["dynamic"] + res["bs"] + res["amp"])) > 1e-6:
+                    violations.append(f"{prefix}:power_sum")
+                if abs(res["EE"] - res["R"] / res["Ptot"]) > 1e-6:
+                    violations.append(f"{prefix}:ee_identity")
+                if abs(res["L"] - (res["Lt"] + res["Lr"])) > 1e-9:
+                    violations.append(f"{prefix}:active_count")
+                if len(violations) >= 20:
+                    break
+            if len(violations) >= 20:
+                break
+        if len(violations) >= 20:
+            break
+
+    if violations:
+        raise RuntimeError(f"Numerical validation failed for {label}: {violations[:5]}")
+    return {
+        "label": label,
+        "checked_total": int(checked_total),
+        "checked_feasible": int(checked_feasible),
+        "violations": 0,
+    }
+
+
+def fairness_audit_proposed_vs_strongest(raw: Dict[str, List[List[Optional[Dict[str, float]]]]]) -> Dict[str, object]:
+    """Confirm proposed includes the strongest-greedy candidate pool."""
+
+    if "proposed" not in raw or "strongest" not in raw:
+        return {"checked_pairs": 0, "violations": 0}
+    checked_pairs = 0
+    worst_excess = 0.0
+    violations = []
+    for rate_idx, (proposed_samples, strongest_samples) in enumerate(zip(raw["proposed"], raw["strongest"])):
+        for sample_idx, (prop, strong) in enumerate(zip(proposed_samples, strongest_samples)):
+            if prop is None or strong is None:
+                continue
+            checked_pairs += 1
+            excess = float(prop["Ptot"] - strong["Ptot"])
+            worst_excess = max(worst_excess, excess)
+            if excess > 1e-7:
+                violations.append({"rate": int(rate_idx), "sample": int(sample_idx + 1), "excess_power": excess})
+                if len(violations) >= 5:
+                    break
+        if len(violations) >= 5:
+            break
+    if violations:
+        raise RuntimeError(f"Fairness audit failed: {violations}")
+    return {"checked_pairs": int(checked_pairs), "violations": 0, "worst_power_excess": float(worst_excess)}
+
+
+def random_audit_summary(cfg: SimConfig, avg_es: Dict[str, List[Optional[Dict[str, float]]]], protocol: str = "ES", q_rand: int = 20) -> Tuple[Dict[str, object], Dict[str, object]]:
+    """Run and summarize a stronger random-search audit outside the main plots."""
+
+    audit_cfg = SimConfig(**asdict(cfg))
+    audit_cfg.random_repeats = int(q_rand)
+    avg_random, raw_random = average_boundary(audit_cfg, protocol=protocol, schemes=("random",))
+    validation = validate_raw_outputs(audit_cfg, raw_random, f"{protocol.upper()} random Q{q_rand}")
+    prop_r12 = point_at_rate(avg_es["proposed"], 12)
+    rand_r12 = point_at_rate(avg_random["random"], 12)
+    stability = {
+        "rate": 12,
+        "proposed_EE": None if prop_r12 is None else float(prop_r12["EE"]),
+        "random_q20_EE": None if rand_r12 is None else float(rand_r12["EE"]),
+        "proposed_minus_random_q20_EE": None if prop_r12 is None or rand_r12 is None else float(prop_r12["EE"] - rand_r12["EE"]),
+        "supports_main_R12_claim": bool(prop_r12 is not None and rand_r12 is not None and prop_r12["EE"] > rand_r12["EE"]),
+    }
+    audit = {
+        "protocol": protocol.upper(),
+        "q_rand": int(q_rand),
+        "config_overrides": {"random_repeats": int(q_rand), "num_mc": int(audit_cfg.num_mc), "seeds": f"1..{audit_cfg.num_mc}"},
+        "average_boundary_random": avg_random["random"],
+        "representative_R12_metrics": representative_metrics(avg_random, rate=12).get("random"),
+        "feasibility_probability": feasibility_table(avg_random, rates=(12, 18, 20)).get("random"),
+        "stability_check": stability,
+        "validation": validation,
+    }
+    return audit, {"raw_random": raw_random}
 
 
 # =========================
@@ -813,8 +984,8 @@ def plot_pareto(avg: Dict[str, List[Optional[Dict[str, float]]]], out_dir: Path)
         if not pts:
             continue
         ax.plot([p["R"] for p in pts], [p["EE"] for p in pts], marker=markers[scheme], label=SCHEME_LABELS[scheme])
-        # Hollow markers identify conditional averages with feasibility below one.
-        outage_pts = [p for p in pts if p.get("feas_prob", 1.0) < 1.0]
+        # Hollow markers identify conditional averages with clearly non-unity feasibility.
+        outage_pts = [p for p in pts if p.get("feas_prob", 1.0) < 0.995]
         if outage_pts:
             ax.plot(
                 [p["R"] for p in outage_pts],
@@ -824,6 +995,16 @@ def plot_pareto(avg: Dict[str, List[Optional[Dict[str, float]]]], out_dir: Path)
                 markerfacecolor="none",
                 markeredgewidth=1.3,
             )
+            if scheme == "passive":
+                for p in outage_pts:
+                    label_offset = (-35, 7) if p["R"] >= max(q["R"] for q in pts) else (3, 7)
+                    ax.annotate(
+                        f"$p_f={p.get('feas_prob', 1.0):.2f}$",
+                        (p["R"], p["EE"]),
+                        textcoords="offset points",
+                        xytext=label_offset,
+                        fontsize=7,
+                    )
     ax.set_xlabel("Sum spectral efficiency (bit/s/Hz)")
     ax.set_ylabel("Normalized energy efficiency (bit/J/Hz)")
     ax.legend(frameon=True, fontsize=7, ncol=2)
@@ -836,13 +1017,17 @@ def plot_design_rules(protocol_boundary: Dict[str, List[Optional[Dict[str, float
     """Plot active-ratio and side-wise-gain rules for ES/TS/SS."""
 
     fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.6))
+    all_rates = sorted({float(p["R"]) for pts in protocol_boundary.values() for p in pts if p is not None})
     for protocol, marker in [("ES", "o"), ("TS", "s"), ("SS", "D")]:
         pts = [p for p in protocol_boundary[protocol] if p is not None]
         axes[0].plot([p["R"] for p in pts], [p["L"] / cfg.N for p in pts], marker=marker, label=protocol)
+    if all_rates:
+        axes[0].plot(all_rates, [cfg.L_uniform / cfg.N] * len(all_rates), linestyle="--", linewidth=1.5, label=rf"Fixed $L={cfg.L_uniform}$")
+        axes[0].plot(all_rates, [1.0] * len(all_rates), linestyle=":", linewidth=1.5, label="Active")
     axes[0].set_xlabel("Target sum-SE (bit/s/Hz)")
     axes[0].set_ylabel("Active ratio")
-    axes[0].set_ylim(0.0, 1.0)
-    axes[0].legend(frameon=True, fontsize=8, ncol=3)
+    axes[0].set_ylim(0.0, 1.05)
+    axes[0].legend(frameon=True, fontsize=7, ncol=2)
     style_map = {"ES": ("o", "-"), "TS": ("s", "--"), "SS": ("D", ":")}
     for protocol in ["ES", "TS", "SS"]:
         pts = [p for p in protocol_boundary[protocol] if p is not None]
@@ -858,28 +1043,46 @@ def plot_design_rules(protocol_boundary: Dict[str, List[Optional[Dict[str, float
     plt.close(fig)
 
 
-def plot_noise_and_dynamics(protocol_noise: Dict[str, List[Dict[str, float]]], protocol_dyn: Dict[str, List[Dict[str, float]]], out_dir: Path) -> None:
-    """Plot amplifier-noise and update-frequency sensitivities."""
+def plot_noise_and_dynamics(noise_by_rate: Dict[str, List[Dict[str, float]]], dyn_by_rate: Dict[str, List[Dict[str, float]]], out_dir: Path) -> None:
+    """Plot ES hardware sensitivity at several target sum-SE levels.
+
+    The three target rates are shown together to highlight that larger active
+    gain is not always beneficial. A higher target can require more coherent
+    gain, but amplifier noise and switching overhead may make the EE-optimal
+    gain smaller than the gain selected at a lower target.
+    """
 
     fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.6))
-    for protocol, marker in [("ES", "o"), ("TS", "s"), ("SS", "D")]:
-        noise = protocol_noise[protocol]
-        axes[0].plot([d["sigma_amp"] for d in noise], [np.nan if d["beta_avg"] is None else d["beta_avg"] for d in noise], marker=marker, label=protocol)
-        dyn = protocol_dyn[protocol]
-        axes[1].plot([d["f_update"] for d in dyn], [np.nan if d["EE"] is None else d["EE"] for d in dyn], marker=marker, label=protocol)
+    markers = {"6": "o", "9": "^", "12": "s", "15": "v", "18": "D"}
+    rate_order = tuple(str(r) for r in sorted((int(k) for k in noise_by_rate.keys()), key=int))
+    for rate in rate_order:
+        noise = noise_by_rate[rate]
+        label = rf"$R_\Sigma={rate}$"
+        axes[0].plot(
+            [d["sigma_amp"] for d in noise],
+            [np.nan if d["beta_avg"] is None else d["beta_avg"] for d in noise],
+            marker=markers[rate],
+            label=label,
+        )
+        dyn = dyn_by_rate[rate]
+        axes[1].plot(
+            [d["f_update"] for d in dyn],
+            [np.nan if d["EE"] is None else d["EE"] for d in dyn],
+            marker=markers[rate],
+            label=label,
+        )
     axes[0].set_xlabel(r"Amplifier-noise std. $\sigma_a$")
     axes[0].set_ylabel("Average side-wise gain")
-    axes[0].legend(frameon=True, fontsize=8, ncol=3)
+    axes[0].legend(frameon=True, fontsize=7, ncol=2)
     axes[1].set_xlabel("Update frequency (Hz)")
-    axes[1].set_ylabel("Normalized energy efficiency (bit/J/Hz)")
-    axes[1].legend(frameon=True, fontsize=8, ncol=3)
+    axes[1].set_ylabel("Normalized EE (bit/J/Hz)")
+    axes[1].legend(frameon=True, fontsize=7, ncol=2)
     fig.tight_layout()
     save_manuscript_figure(fig, out_dir, "fig_noise_dynamic")
     plt.close(fig)
 
-
 def plot_power_breakdown(breakdown_map: Dict[int, Dict[str, Dict[str, float]]], out_dir: Path) -> None:
-    """Plot two power-breakdown panels for representative target-rate points."""
+    """Plot stacked power breakdowns for representative target-rate points."""
 
     rates = [12, 16]
     short_labels = {
@@ -891,15 +1094,9 @@ def plot_power_breakdown(breakdown_map: Dict[int, Dict[str, Dict[str, float]]], 
         "active": "Active",
         "proposed": "Prop.",
     }
-    fig, axes = plt.subplots(1, 2, figsize=(8.4, 2.8), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 2.85), sharey=False)
     legend_handles = None
     legend_labels = None
-    ymax = 0.0
-    for rate in rates:
-        breakdown = breakdown_map[rate]
-        schemes = [s for s in SCHEME_ORDER if s in breakdown]
-        total = np.array([breakdown[s]["static"] + breakdown[s]["dynamic"] + breakdown[s]["bs"] + breakdown[s]["amp"] for s in schemes])
-        ymax = max(ymax, float(np.max(total)))
     for ax, rate in zip(axes, rates):
         breakdown = breakdown_map[rate]
         schemes = [s for s in SCHEME_ORDER if s in breakdown]
@@ -907,28 +1104,28 @@ def plot_power_breakdown(breakdown_map: Dict[int, Dict[str, Dict[str, float]]], 
         dynamic = np.array([breakdown[s]["dynamic"] for s in schemes])
         bs = np.array([breakdown[s]["bs"] for s in schemes])
         amp = np.array([breakdown[s]["amp"] for s in schemes])
+        total = static + dynamic + bs + amp
         x = np.arange(len(schemes))
         ax.bar(x, static, label="Static")
         ax.bar(x, dynamic, bottom=static, label="Dynamic")
         ax.bar(x, bs, bottom=static + dynamic, label="BS transmit")
         ax.bar(x, amp, bottom=static + dynamic + bs, label="Amplification")
         ax.set_xticks(x)
-        ax.set_xticklabels([short_labels[s] for s in schemes], rotation=25, ha="right", fontsize=7)
+        ax.set_xticklabels([short_labels[s] for s in schemes], rotation=22, ha="right", fontsize=7)
         ax.set_title(rf"$R_\Sigma={rate}$ bit/s/Hz", fontsize=9)
-        ax.set_ylim(0.0, 1.12 * ymax)
+        ax.set_ylim(0.0, 1.35 * float(np.max(total)))
+        ax.set_ylabel("Power (W)")
         if legend_handles is None:
             legend_handles, legend_labels = ax.get_legend_handles_labels()
-    axes[0].set_ylabel("Power consumption (W)")
-    fig.legend(legend_handles, legend_labels, loc="upper center", ncol=4, frameon=True, fontsize=8, bbox_to_anchor=(0.5, 1.06))
-    fig.tight_layout(rect=(0, 0, 1, 0.90))
+    axes[0].legend(legend_handles[:2], legend_labels[:2], loc="upper center", ncol=2, frameon=True, fontsize=6.5)
+    axes[1].legend(legend_handles[2:], legend_labels[2:], loc="upper center", ncol=2, frameon=True, fontsize=6.5)
+    fig.tight_layout(pad=0.35)
     save_manuscript_figure(fig, out_dir, "fig_power_breakdown")
     plt.close(fig)
 
 
 
-# =========================
-# Main workflow
-# =========================
+
 def main() -> None:
     """Run all reproducibility experiments and write figures/JSON results."""
 
@@ -940,62 +1137,84 @@ def main() -> None:
     results_dir.mkdir(exist_ok=True)
     cfg = SimConfig()
 
-    # Remove any existing result JSON before writing the output for this configuration.
-    for old_json in results_dir.glob("*.json"):
-        old_json.unlink()
+    # Replace only the canonical result file for this configuration.
+    result_json = results_dir / "hybrid_star_ris_results.json"
+    if result_json.exists():
+        result_json.unlink()
 
     timings: Dict[str, float] = {}
+    validations: Dict[str, object] = {}
 
     t0 = time.perf_counter()
     avg_es, raw_es = average_boundary(cfg, protocol="ES")
     timings["average_boundary_es_seconds"] = time.perf_counter() - t0
+    validations["average_boundary_es"] = validate_raw_outputs(cfg, raw_es, "ES main boundary")
+    validations["fairness_proposed_vs_strongest_es"] = fairness_audit_proposed_vs_strongest(raw_es)
     breakdown_es_12 = average_breakdown_for_R(cfg, raw_es, Rtarget=12)
     breakdown_es_16 = average_breakdown_for_R(cfg, raw_es, Rtarget=16)
 
     protocol_boundary: Dict[str, List[Optional[Dict[str, float]]]] = {"ES": avg_es["proposed"]}
     for protocol in ("TS", "SS"):
         t0 = time.perf_counter()
-        avg_p, _ = average_boundary(cfg, protocol=protocol, schemes=("proposed",))
+        avg_p, raw_p = average_boundary(cfg, protocol=protocol, schemes=("proposed",))
         timings[f"average_boundary_{protocol.lower()}_proposed_seconds"] = time.perf_counter() - t0
+        validations[f"average_boundary_{protocol.lower()}_proposed"] = validate_raw_outputs(cfg, raw_p, f"{protocol} proposed boundary")
         protocol_boundary[protocol] = avg_p["proposed"]
 
     sigmas = np.linspace(0.02, 0.18, 9)
     f_updates = np.arange(50, 551, 50)
-    protocol_noise = {}
-    protocol_dyn = {}
-    for p in ("ES", "TS", "SS"):
+    sensitivity_rates = (6, 9, 12, 15, 18)
+    es_noise_by_rate = {}
+    es_dyn_by_rate = {}
+    for R in sensitivity_rates:
+        key = str(R)
         t0 = time.perf_counter()
-        protocol_noise[p] = sweep_sigma_amp(sigmas, cfg, Rtarget=12.0, protocol=p)
-        timings[f"noise_sweep_{p.lower()}_seconds"] = time.perf_counter() - t0
+        es_noise_by_rate[key] = sweep_sigma_amp(sigmas, cfg, Rtarget=float(R), protocol="ES")
+        timings[f"noise_sweep_es_R{R}_seconds"] = time.perf_counter() - t0
         t0 = time.perf_counter()
-        protocol_dyn[p] = sweep_update_frequency(f_updates, cfg, Rtarget=12.0, protocol=p)
-        timings[f"dynamic_sweep_{p.lower()}_seconds"] = time.perf_counter() - t0
+        es_dyn_by_rate[key] = sweep_update_frequency(f_updates, cfg, Rtarget=float(R), protocol="ES")
+        timings[f"dynamic_sweep_es_R{R}_seconds"] = time.perf_counter() - t0
+
+    t0 = time.perf_counter()
+    random_audit_es_q20, _ = random_audit_summary(cfg, avg_es, protocol="ES", q_rand=20)
+    timings["random_audit_es_q20_seconds"] = time.perf_counter() - t0
+
+    reliability_blockers = []
+    if not random_audit_es_q20["stability_check"]["supports_main_R12_claim"]:
+        reliability_blockers.append("Q_rand=20 random audit does not leave the proposed design above random at R=12.")
 
     plot_pareto(avg_es, fig_dir)
     plot_design_rules(protocol_boundary, cfg, fig_dir)
-    plot_noise_and_dynamics(protocol_noise, protocol_dyn, fig_dir)
+    plot_noise_and_dynamics(es_noise_by_rate, es_dyn_by_rate, fig_dir)
     plot_power_breakdown({12: breakdown_es_12, 16: breakdown_es_16}, fig_dir)
     summary = {
-        "result_schema": "hybrid_star_ris_v4_surrogate_baselines",
+        "result_schema": "hybrid_star_ris_mc10000_reliability",
         "config": {**asdict(cfg), "lambda1_effective": eq23_weights(cfg)[0], "lambda2_effective": eq23_weights(cfg)[1]},
+        "runtime_environment": runtime_environment(cfg),
         "scheme_order": list(SCHEME_ORDER),
         "scheme_labels": SCHEME_LABELS,
         "average_boundary_es": avg_es,
         "representative_R12_metrics_es": representative_metrics(avg_es, rate=12),
         "feasibility_probability_es": feasibility_table(avg_es, rates=(12, 18, 20)),
         "protocol_design_rules": protocol_boundary,
-        "protocol_noise_sweep": protocol_noise,
-        "protocol_dynamic_sweep": protocol_dyn,
+        "es_noise_sweep_by_rate": es_noise_by_rate,
+        "es_dynamic_sweep_by_rate": es_dyn_by_rate,
         "power_breakdown_at_R12_es": breakdown_es_12,
         "power_breakdown_at_R16_es": breakdown_es_16,
+        "random_audit_es_q20": random_audit_es_q20,
+        "validations": validations,
+        "reliability_blockers": reliability_blockers,
         "complexity_summary": complexity_summary(cfg),
-        "runtime_seconds": timings,
     }
-    with open(results_dir / "hybrid_star_ris_results.json", "w", encoding="utf-8") as f:
+    with open(result_json, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
     print("Simulation completed.")
     print(f"Figures saved under: {fig_dir}")
-    print(f"Summary JSON: {results_dir / 'hybrid_star_ris_results.json'}")
+    print(f"Summary JSON: {result_json}")
+    if reliability_blockers:
+        print("Reliability blockers detected:")
+        for item in reliability_blockers:
+            print(f"- {item}")
 
 
 if __name__ == "__main__":

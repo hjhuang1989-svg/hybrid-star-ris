@@ -1,7 +1,0 @@
-code/__pycache__/
-*.py[cod]
-
-paper/*.aux
-paper/*.log
-paper/*.out
-paper/*.toc
