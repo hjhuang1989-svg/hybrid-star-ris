@@ -1,5 +1,8 @@
 \documentclass[journal]{IEEEtran}
 
+\ifdefined\pdfinfoomitdate\pdfinfoomitdate=1\fi
+\ifdefined\pdftrailerid\pdftrailerid{}\fi
+
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts,amsthm,bm,mathtools}
 \usepackage{graphicx}
@@ -429,7 +432,7 @@ Fig.~\ref{fig:noise_dyn} shows hardware sensitivity at $R_\Sigma=6$, $9$, $12$, 
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.82\columnwidth]{fig_power_trace_preview.eps}
+\includegraphics[width=0.82\columnwidth]{fig_power_trace.eps}
 \caption{Total power of the proposed finite candidate search.}
 \label{fig:power_trace}
 \vspace{-1.6ex}

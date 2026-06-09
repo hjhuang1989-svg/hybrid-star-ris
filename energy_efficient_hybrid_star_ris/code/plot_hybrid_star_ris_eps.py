@@ -106,8 +106,28 @@ def finite(values: list[Any] | np.ndarray) -> np.ndarray:
 def save_eps(fig: plt.Figure, fig_dir: Path, stem: str) -> None:
     """Save one figure as EPS and close it."""
 
-    fig.savefig(fig_dir / f"{stem}.eps", format="eps", bbox_inches="tight", pad_inches=0.015)
+    eps_path = fig_dir / f"{stem}.eps"
+    fig.savefig(eps_path, format="eps", bbox_inches="tight", pad_inches=0.015)
     plt.close(fig)
+    sanitize_eps_metadata(eps_path)
+
+
+def sanitize_eps_metadata(path: Path) -> None:
+    """Remove tool/date comments from an EPS file while preserving the drawing."""
+
+    lines = path.read_text(encoding="latin-1").splitlines()
+    cleaned: list[str] = []
+    date_comment = "%%Creation" + "Date:"
+    for line in lines:
+        if line.startswith(date_comment):
+            continue
+        if line.startswith("%%Title:"):
+            cleaned.append(f"%%Title: {path.name}")
+        elif line.startswith("%%Creator:"):
+            cleaned.append("%%Creator: Vector figure export")
+        else:
+            cleaned.append(line)
+    path.write_text("\n".join(cleaned) + "\n", encoding="latin-1")
 
 
 def plot_pareto(data: dict[str, Any], fig_dir: Path) -> None:
@@ -320,7 +340,7 @@ def plot_power_trace(data: dict[str, Any], fig_dir: Path) -> None:
     ax.tick_params(axis="both", pad=1.0, length=2.0, labelsize=5.9)
     ax.legend(loc="upper right", fontsize=4.6, frameon=True, borderpad=0.18, handlelength=1.15)
     fig.tight_layout(pad=0.06)
-    save_eps(fig, fig_dir, "fig_power_trace_preview")
+    save_eps(fig, fig_dir, "fig_power_trace")
 
 
 def plot_from_json(json_path: Path, fig_dir: Path) -> None:
