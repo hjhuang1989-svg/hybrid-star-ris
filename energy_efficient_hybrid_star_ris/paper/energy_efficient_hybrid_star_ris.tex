@@ -58,12 +58,13 @@
 \title{Energy-Efficient Hybrid STAR-RIS via Sparse Active Selection and Gain Control}
 
 \author{Hongjian Huang, Yunpei Chen, Xingang Xie, Xiaonan Yang, and Renjie Liang%
-\thanks{Corresponding author: Renjie Liang. Code repository: \url{https://github.com/hjhuang1989-svg/hybrid-star-ris}.}}
+\thanks{Corresponding author: Renjie Liang.\protect\\
+Repository: \url{https://github.com/hjhuang1989-svg/hybrid-star-ris}.}}
 \maketitle
 
 
 \begin{abstract}
-Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE), but their energy efficiency (EE) is limited by amplifier noise and non-negligible hardware power. This letter studies the energy-splitting (ES) protocol and traces an achievable EE-SE boundary with a multi-component power model that includes base station (BS) power-amplifier power, controller/bias power, switching overhead, and gain-dependent amplification power. The analysis yields an amplification ON-OFF criterion, a closed-form SE-oriented gain law, and an EE-oriented gain refinement, which are integrated with sparse active selection. Simulations under Nakagami-$m$ fading show that sparse active selection reduces BS power at demanding SE targets while avoiding the overhead of a fully active STAR-RIS.
+Hybrid active-passive simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) can improve spectral efficiency (SE), but their energy efficiency (EE) is limited by amplifier noise and non-negligible hardware power. This letter studies an achievable EE-SE boundary with a multi-component power model under the energy-splitting (ES) protocol, including base station (BS) power-amplifier power, controller/bias power, switching overhead, and gain-dependent amplification power. The analysis yields an amplification ON-OFF criterion, a closed-form SE-oriented gain law, and an EE-oriented power-minimizing gain update, which are integrated with sparse active selection. Simulations under Nakagami-$m$ fading show that the proposed selection and gain-control procedure improves the EE-SE tradeoff by activating only cost-effective elements, reducing BS transmit power at high-SE targets while avoiding excessive active-noise amplification and hardware overhead.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -72,14 +73,14 @@ STAR-RIS, active RIS, hybrid active-passive RIS, energy efficiency, spectral eff
 
 
 \section{Introduction}
-Reconfigurable intelligent surfaces (RISs) can enhance wireless propagation through passive beam manipulation \cite{wu2019irs,bjornson2020irsrelay,bjornson2020myths}. Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend this capability to two-side service, allowing one surface to support transmission-side and reflection-side users at the same time \cite{liu2021star,mu2022star}. This two-side operation is attractive for asymmetric coverage, but passive STAR-RIS still suffers from multiplicative path loss, especially when moderate or high spectral efficiency is required.
+Reconfigurable intelligent surfaces (RISs) can enhance wireless propagation through passive beam manipulation \cite{wu2019irs,bjornson2020myths,bjornson2022signalperspective}. Simultaneously transmitting and reflecting reconfigurable intelligent surfaces (STAR-RISs) extend this capability to two-side service, allowing one surface to support transmission-side and reflection-side users at the same time \cite{liu2021star,mu2022star}. This two-side operation is attractive for asymmetric coverage, but passive STAR-RIS still suffers from multiplicative path loss, especially when moderate or high spectral efficiency is required.
 
 A direct way to compensate for this loss is to embed active elements into the surface. However, active amplification is not a free array gain: it injects amplifier noise and introduces hardware power consumption \cite{xu2023activestar,ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal}. Measurement-driven RIS studies further show that controller, bias, and switching power should be modeled explicitly rather than absorbed into a single constant \cite{wang2023static,wang2024practical}. These effects are particularly relevant for STAR-RIS because the two sides share aperture, power splitting, and the active-element budget.
 
-Existing active and hybrid RIS/STAR-RIS studies have optimized transmit power, outage, or EE under different hardware assumptions \cite{mu2022star,xu2023activestar,ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal,zhang2023activevspassive}, while measurement-driven studies model controller, unit-cell, and switching-related RIS power separately \cite{wang2023static,wang2024practical}. However, the joint impact of amplifier noise, sparse activation, dynamic switching overhead, and side-wise rate allocation on the EE-SE tradeoff is still not captured under a common ES boundary-generation framework. This motivates an ES-focused design in which the active-noise and hardware-power terms remain explicit in both the gain analysis and the active-selection rule. The contributions are threefold. First, a multi-component EE model is formulated for hybrid active-passive STAR-RIS under ES, separating BS power-amplifier (PA) power, controller/bias consumption, switching overhead, gain-dependent amplification power, and active noise. Second, an analytical gain structure is derived, including an amplification ON-OFF criterion, a closed-form SE-oriented gain law, and an EE-oriented gain refinement for side-wise power minimization. Third, a finite-grid active-set selection and gain-control algorithm is developed to generate achievable EE-SE boundary points under binary activation, side assignment, gain update, and feasibility checking.
+Existing active and hybrid RIS/STAR-RIS studies have optimized transmit power, outage, or EE under different hardware assumptions \cite{mu2022star,xu2023activestar,ma2023activeee,peng2023hybrid,huang2024hybrid,zhang2022signal,zhang2023activevspassive}, while measurement-driven studies model controller, unit-cell, and switching-related RIS power separately \cite{wang2023static,wang2024practical}. However, the joint impact of amplifier noise, sparse activation, dynamic switching overhead, and side-wise rate allocation on the EE-SE tradeoff is still not captured under a common ES boundary-generation framework. This motivates an ES-focused design in which the active-noise and hardware-power terms remain explicit in both the gain analysis and the active-selection rule. The contributions are threefold. First, a multi-component EE model is formulated for hybrid active-passive STAR-RIS under ES, separating BS power-amplifier (PA) power, controller/bias consumption, switching overhead, gain-dependent amplification power, and active noise. Second, an analytical gain structure is derived, including an amplification ON-OFF criterion, a closed-form SE-oriented gain law, and an EE-oriented power-minimizing gain rule. Third, a finite-grid active-set selection and gain-control algorithm is developed to generate achievable EE-SE boundary points under binary activation, side assignment, gain update, and feasibility checking.
 
 \section{System Model}
-\subsection{Hybrid Active-Passive STAR-RIS Downlink}
+\subsection{Hybrid STAR-RIS Downlink}
 Consider the downlink in Fig.~\ref{fig:system}, where a BS with $M$ antennas serves $K_t$ transmission-side users and $K_r$ reflection-side users through an $N$-element STAR-RIS. The user-index sets are $\mathcal{K}_t=\{1,\ldots,K_t\}$ and $\mathcal{K}_r=\{1,\ldots,K_r\}$. Under the ES protocol \cite{mu2022star}, the $n$th STAR-RIS element is parameterized as
 \begin{equation}
 \theta_{n,s}=\sqrt{\rho_{n,s}}\beta_{n,s}e^{j\phi_{n,s}},\qquad s\in\{t,r\},
@@ -90,7 +91,7 @@ where $\rho_{n,s}$ is the power-splitting coefficient, $\beta_{n,s}$ is the ampl
 \begin{figure}[!t]
 \centering
 \includegraphics[width=0.90\columnwidth]{systemEE3_clean.jpg}
-\caption{Hybrid active-passive STAR-RIS-assisted two-side downlink.}
+\caption{Hybrid STAR-RIS-assisted downlink.}
 \label{fig:system}
 \end{figure}
 
@@ -103,8 +104,10 @@ y_{s,k}=\mathbf{h}_{s,k}^H\mathbf{\Theta}_s\mathbf{G}
 \end{equation}
 where $\mathbf{\Theta}_s=\diag(\theta_{1,s},\ldots,\theta_{N,s})$, the summation index $q\in\{t,r\}$ enumerates the side of each transmitted stream, $\mathbf{w}_{q,j}\in\mathbb{C}^{M}$ is the BS beamformer for user $(q,j)$, $x_{q,j}$ is the unit-power information symbol, and $n_{s,k}\sim\mathcal{CN}(0,\sigma_0^2)$ is thermal noise. The vector $\mathbf{n}_{a,s}$ represents the amplified noise contributed by active elements on side $s$. Following the active-RIS noise model in \cite{zhang2022signal,ma2023activeee}, it is modeled as
 \begin{equation}
-\mathbf{n}_{a,s}\sim\mathcal{CN}(\mathbf{0},\mathbf{C}_{a,s}),\qquad
-\mathbf{C}_{a,s}=\diag(c_{1,s},\ldots,c_{N,s}),
+\begin{aligned}
+\mathbf{n}_{a,s} &\sim \mathcal{CN}(\mathbf{0},\mathbf{C}_{a,s}),\\
+\mathbf{C}_{a,s} &= \diag(c_{1,s},\ldots,c_{N,s}).
+\end{aligned}
 \label{eq:na_stat}
 \end{equation}
 where $c_{n,s}=\rho_{n,s}\beta_{n,s}^2\sigma_a^2$ for $n\in\mathcal{A}_s$ and $c_{n,s}=0$ otherwise, with $\sigma_a^2$ denoting the input-referred active-element noise variance. The SINR of user $(s,k)$ is then
@@ -135,7 +138,7 @@ P_{\mathrm{tot}}
 where $\etaPA$ is the BS PA efficiency, $|\mathcal{A}|$ is the number of active elements, $P_{\mathrm{ctrl}}$ is the controller power, $P_{\mathrm{bias}}$ is the per-active-element bias power, $f_u$ is the update frequency, $E_{\mathrm{sw},0}$ and $E_{\mathrm{sw},1}$ are the base and per-active-element switching energies per update, and $\mu_t,\mu_r$ are the gain-dependent amplifier-power coefficients. The four components in \eqref{eq:power_model} are the PA-normalized BS transmit power, static controller/bias power, update-rate-weighted switching power, and gain-dependent amplification power.
 
 \subsection{Equivalent Scalar Model}
-To obtain a tractable EE-SE boundary, the full model is reduced to an equivalent scalar form using four standard approximations: residual multiuser leakage in \eqref{eq:sinr_full} is neglected, common side-wise splitting and gain are used with $\rho_{n,s}=\rho_s$ and $\beta_{n,s}=\beta_s$ for $n\in\mathcal{A}_s$, dominant cascaded paths are phase-aligned, and the side target $R_s$ is enforced by assigning the same target $R_s/K_s$ to every user on side $s$, so that the $K_s$ user targets sum to $R_s$.
+To obtain a tractable EE-SE boundary, the full model is reduced to an equivalent scalar form using four approximations: residual multiuser leakage in \eqref{eq:sinr_full} is neglected, common side-wise splitting and gain are used with $\rho_{n,s}=\rho_s$ and $\beta_{n,s}=\beta_s$ for $n\in\mathcal{A}_s$, dominant cascaded paths are phase-aligned, and the side target $R_s$ is enforced by assigning the same target $R_s/K_s$ to every user on side $s$, so that the $K_s$ user targets sum to $R_s$.
 
 Let $\mathbf v_{s,k}$ be a normalized post-zero-forcing (post-ZF) BS direction, and let $\mathbf e_n$ be the $n$th canonical basis vector in $\mathbb{R}^N$. The scalar BS-to-element gain is represented by the stream-averaged effective magnitude
 \[
@@ -169,12 +172,12 @@ p_s^{\min}(\beta_s)=
 \end{equation}
 
 \section{Problem Formulation}
-The sum spectral efficiency is
+Define the sum spectral efficiency as
 \begin{equation}
 R_\Sigma=\sum_{s\in\{t,r\}}\sum_{k\in\mathcal{K}_s}\log_2(1+\gamma_{s,k}).
 \label{eq:sumrate}
 \end{equation}
-The EE metric $\mathrm{EE}=R_\Sigma/P_{\mathrm{tot}}$ is used throughout. Let $\mathcal X\triangleq\{\mathbf W,\rho_t,\rho_r,\bm\phi,\beta_t,\beta_r,\mathcal A_t,\mathcal A_r\}$. The EE maximization problem is
+Throughout the letter, energy efficiency is measured by $\mathrm{EE}=R_\Sigma/P_{\mathrm{tot}}$. Let $\mathcal X\triangleq\{\mathbf W,\rho_t,\rho_r,\bm\phi,\beta_t,\beta_r,\mathcal A_t,\mathcal A_r\}$. The EE maximization problem is
 \begin{equation}
 \begin{aligned}
 \max_{\mathcal X}
@@ -206,7 +209,7 @@ R_\Sigma \ge \epsilon, \\
 \end{aligned}
 \label{eq:epsilon}
 \end{equation}
-In the proposed procedure, the generic quality-of-service (QoS) terms are instantiated as $\bar R_{s,k}=R_s/K_s$, with $R_t=\alpha\epsilon$ and $R_r=(1-\alpha)\epsilon$, so that the per-user constraints realize the side targets in \eqref{eq:minsidepower}. Because the procedure uses structured sparse activation and finite grids, the generated curve is an achievable Pareto-frontier approximation rather than a certified global optimum. The model structure is then exploited to derive practical design rules.
+In the proposed procedure, the quality-of-service (QoS) terms are instantiated as $\bar R_{s,k}=R_s/K_s$, with $R_t=\alpha\epsilon$ and $R_r=(1-\alpha)\epsilon$, so that the per-user constraints realize the side targets in \eqref{eq:minsidepower}. Because the procedure uses structured sparse activation and finite grids, the generated curve is an achievable Pareto-frontier approximation rather than a certified global optimum. The model structure is then exploited to derive practical design rules.
 
 \section{Gain Structure}
 \subsection{Amplification ON-OFF Criterion}
@@ -295,7 +298,7 @@ Condition \eqref{eq:convexity_cond} is sufficient but not necessary. When it is 
 \section{Sparse Active Selection and Gain Control}
 For a target sum-SE level $\epsilon$ in \eqref{eq:epsilon}, this section constructs one feasible candidate of $\mathcal P(\epsilon)$. The target is split into side rates by $R_t=\alpha\epsilon$ and $R_r=(1-\alpha)\epsilon$, where $\alpha\in\mathcal G_\alpha$, while $L\in\mathcal L$ specifies the number of active elements. Use $x_{n,s}\in\{0,1\}$, $s\in\{t,r\}$, with $x_{n,s}=1$ iff element $n$ is active on side $s$. The constraints $x_{n,t}+x_{n,r}\le 1$ and $\sum_{n=1}^{N}(x_{n,t}+x_{n,r})=L$ impose side-exclusive activation with $L$ active elements; $x_{n,t}=x_{n,r}=0$ denotes a passive element, and $\mathcal A_s=\{n:x_{n,s}=1\}$. Rather than solve the exact combinatorial program, Algorithm~\ref{alg:selection_gain} constructs ranked binary candidates and evaluates them under the scalar model.
 
-\subsection{Step 1: Selecting \texorpdfstring{$L$}{L} Active Elements}
+\subsection{Selecting \texorpdfstring{$L$}{L} Active Elements}
 For fixed $(L,\alpha)$, an element is useful if its coherent-gain contribution can reduce the BS power more than its added active-noise and hardware-power costs. Let
 \[
 C_s=\frac{K_s(2^{R_s/K_s}-1)}{\etaPA},
@@ -335,19 +338,19 @@ A value $\tilde{\xi}_{n,s}>1$ indicates that the first-order coherent-gain savin
 \endgroup
 The numerator is the side-weighted coherent increment, while the denominator normalizes the active-noise increment and per-active-element hardware overhead.
 
-\subsection{Step 2: Assigning Active Elements to Sides}
+\subsection{Assigning Active Elements to Sides}
 For each $(L,\alpha)$, two candidate active-set pairs are constructed by the same rule: choose each element's preferred side, retain the $L$ largest preferred scores, and split the retained indices according to their preferred sides. For the cost-aware pair, define $s_n^{\mathrm{ca}}=\arg\max_{s\in\{t,r\}}\xi_{n,s}$ and $\xi_n^{\mathrm{ca}}=\xi_{n,s_n^{\mathrm{ca}}}$. Let $\mathcal S^{\mathrm{ca}}$ contain the $L$ largest values of $\xi_n^{\mathrm{ca}}$, and set $\mathcal A_s^{\mathrm{ca}}=\{n\in\mathcal S^{\mathrm{ca}}:s_n^{\mathrm{ca}}=s\}$ for $s\in\{t,r\}$. Thus, selection and side assignment are coupled by the same score.
 
 The second pair is channel-strength based and is used as the strongest-greedy baseline in Sec.~VI. It removes the denominator of \eqref{eq:score} and uses $\pi_{n,s}=\omega_s\Delta u_{n,s}$. With $s_n^{\mathrm{st}}=\arg\max_{s\in\{t,r\}}\pi_{n,s}$ and $\pi_n^{\mathrm{st}}=\pi_{n,s_n^{\mathrm{st}}}$, the $L$ largest values of $\pi_n^{\mathrm{st}}$ form $\mathcal S^{\mathrm{st}}$, and $\mathcal A_s^{\mathrm{st}}=\{n\in\mathcal S^{\mathrm{st}}:s_n^{\mathrm{st}}=s\}$ for $s\in\{t,r\}$. Both candidate pairs are evaluated in Algorithm~\ref{alg:selection_gain}.
 
-\subsection{Step 3: Updating \texorpdfstring{$(\beta_t,\beta_r)$}{(beta t, beta r)}}
+\subsection{Updating \texorpdfstring{$(\beta_t,\beta_r)$}{(beta t, beta r)}}
 For each candidate pair $(\mathcal A_t,\mathcal A_r)$, the coefficients $(a_s,b_s,c_s,d_s)$ are computed from \eqref{eq:abcd}. The boundary cases in Proposition~\ref{prop:se_optimal} are handled by setting $\beta_s=1$ when $|\mathcal A_s|=0$ or $b_s=0$. Otherwise, the EE-oriented gain is updated by
 \[
 \beta_s^\star=\arg\min_{1\le\beta_s\le\beta_{\max}}\Psi_s(\beta_s),
 \]
 where $\Psi_s(\beta_s)$ is given in \eqref{eq:side_cost}. The updated gains determine the required side powers $p_t^{\min}(\beta_t^\star)$ and $p_r^{\min}(\beta_r^\star)$ through \eqref{eq:minsidepower}.
 
-\subsection{Step 4: Feasibility Check and Boundary-Point Selection}
+\subsection{Feasibility Check and Boundary-Point Selection}
 After the gain update, each candidate is checked against the scalar-model version of \eqref{eq:P0}: the BS transmit-power budget, the gain bounds, the non-overlapping active-set constraint, the ES splitting constraints, and the optional safety cap $\Gamma_s$. Among all feasible candidates for the current target $\epsilon$, the returned boundary point is
 \[
 \mathcal B^\star=\big(\mathcal A_t^\star,\mathcal A_r^\star,\beta_t^\star,\beta_r^\star,
@@ -376,76 +379,76 @@ where $P_{\mathrm{tot}}^\star$ is the smallest feasible value of \eqref{eq:power
         \Statex \hspace{\algorithmicindent} and $\mathcal B^\star=(\mathcal A_t,\mathcal A_r,\beta_t^\star,\beta_r^\star,\alpha,p_t^{\min},p_r^{\min},P_{\mathrm{tot}},\epsilon/P_{\mathrm{tot}})$.
     \EndFor
 \EndFor
-\State \textbf{If} $\mathcal B^\star=\emptyset$, \textbf{return} $\emptyset$.
-\State \textbf{Otherwise} \textbf{return} $\mathcal B^\star$.
+\State \textbf{return} $\mathcal B^\star$.
 \end{algorithmic}
 \vspace{-0.5ex}
 \end{algorithm}
 
 \subsection{Complexity}
-Let $G=|\mathcal{G}_{\alpha}|$, $L_g=|\mathcal{L}|$, $K=K_t+K_r$, and $Q_\beta$ denote the bounded one-dimensional gain-search budget. For each boundary point, score computation, sorting, active-set evaluation, and gain update require $\mathcal{O}(L_gG(N\log N+NK+Q_{\beta}))$ operations. For $E$ sampled SE targets, the total complexity is $\mathcal{O}(E L_gG(N\log N+NK+Q_{\beta}))$, and the memory cost is dominated by channel coefficients and element scores.
+Let $G=|\mathcal{G}_{\alpha}|$, $L_g=|\mathcal{L}|$, $K=K_t+K_r$, and $Q_\beta$ be the bounded gain-search budget. For one SE target, the proposed finite-grid ranker requires $\mathcal{O}(L_gG(N\log N+NK+Q_\beta))$ operations for scoring, sorting, feasibility checking, and gain update; for $E$ targets the cost scales linearly by $E$. The memory cost is dominated by the channel coefficients and element scores.
 
 
 \section{Numerical Results}
-In this section, simulations evaluate the achievable EE-SE boundary, hardware sensitivity, and power distribution of the proposed sparse active-selection design. Unless otherwise stated, the STAR-RIS has $N=24$ elements and serves $K_t=K_r=2$ users. The channels follow Nakagami-$m$ fading with $\mBR=\mRU=1$ and normalized average link-power scalings $\Omega_{BR}=0.20$, $\Omega_t=(0.060,0.050)$, and $\Omega_r=(0.080,0.060)$. We use $(\rho_t,\rho_r)=(0.55,0.45)$, $\beta_{\max}=5$, $P_{\max}^{\mathrm{BS}}=5$ W, $\sigma_0^2=6.25\times10^{-2}$, $\sigma_a^2=2.5\times10^{-3}$, and $\etaPA=0.40$. The search grids are $\mathcal G_\alpha=\{0.20,0.25,\ldots,0.80\}$ and $\mathcal L=\{0,3,\ldots,24\}$. Hardware-power coefficients follow measured RIS power models and are set to $P_{\mathrm{ctrl}}=0.10$ W, $P_{\mathrm{bias}}=0.015$ W, $f_u=50$ Hz, $(E_{\mathrm{sw},0},E_{\mathrm{sw},1})=(2.0,1.2)\times10^{-4}$ J, and $\mu_t=\mu_r=2.5\times10^{-3}$ W \cite{wang2023static,wang2024practical}. These settings follow common two-side STAR-RIS layouts \cite{mu2022star}, hybrid/active RIS EE studies and active-noise models \cite{ma2023activeee,peng2023hybrid,zhang2022signal,zhang2023activevspassive}, and Nakagami-$m$ RIS channel analysis \cite{ni2023nakagami}. Each plotted Monte Carlo (MC) point averages independent channel realizations generated by the reproducibility script.
+Simulations evaluate the EE-SE boundary, hardware sensitivity, power distribution, and candidate-search behavior. The baselines include passive ($L=0$), active ($L=N$), fixed/optimized uniform, single-random sparse, and strongest greedy. Unless otherwise stated, $N=24$, $K_t=K_r=2$, and the Nakagami-$m$ channels use $\mBR=\mRU=1$ with $\Omega_{BR}=0.20$, $\Omega_t=(0.060,0.050)$, and $\Omega_r=(0.080,0.060)$. We set $(\rho_t,\rho_r)=(0.55,0.45)$, $\beta_{\max}=5$, $P_{\max}^{\mathrm{BS}}=5$ W, $\sigma_0^2=6.25\times10^{-2}$, $\sigma_a^2=2.5\times10^{-3}$, and $\etaPA=0.40$. The grids are $\mathcal G_\alpha=\{0.20,0.25,\ldots,0.80\}$ and $\mathcal L=\{0,3,\ldots,24\}$. Motivated by measured RIS power models, $(P_{\mathrm{ctrl}},P_{\mathrm{bias}},f_u)=(0.10\mathrm{~W},0.015\mathrm{~W},50\mathrm{~Hz})$, $(E_{\mathrm{sw},0},E_{\mathrm{sw},1})=(2.0,1.2)\times10^{-4}$ J, and $\mu_t=\mu_r=2.5\times10^{-3}$ W \cite{wang2023static,wang2024practical}. The channel and active-noise settings follow \cite{mu2022star,ma2023activeee,peng2023hybrid,zhang2022signal,zhang2023activevspassive,ni2023nakagami}, and each plotted Monte Carlo (MC) point averages 10000 independent realizations.
 
-The baselines include passive ($L=0$), active ($L=N$), fixed/optimized uniform, single-random sparse, strongest greedy, reweighted-$\ell_1$ sparse selection \cite{long2024poweraware}, and hybrid AO/SCA refinement \cite{nguyen2022hybrid}.
-
-Fig.~\ref{fig:pareto} shows the EE-SE boundary and the main power-allocation tradeoff. Passive STAR-RIS is competitive at low SE, but its BS-power requirement grows rapidly with $R_\Sigma$ and becomes infeasible when it exceeds $P_{\max}^{\mathrm{BS}}$. The unfilled passive markers at high $R_\Sigma$ are averaged over feasible trials only. The active benchmark lowers BS power but incurs substantial static, switching, and amplification overhead. The proposed, strongest-greedy, reweighted-$\ell_1$, and AO/SCA-refined curves are close in this setup because their selected active sets often overlap, while the proposed ranker keeps the finite-grid search cost-aware by penalizing active noise and hardware costs.
+Fig.~\ref{fig:pareto} shows the EE-SE boundary and the main power-allocation tradeoff. Passive STAR-RIS is competitive at low SE, but its BS-power requirement grows rapidly with $R_\Sigma$ and becomes infeasible when it exceeds $P_{\max}^{\mathrm{BS}}$. The unfilled passive markers at high $R_\Sigma$ are averaged over feasible trials only, and their labels report the passive feasibility probability $p_f^{\mathrm{pass}}$, which is $0.99$ and $0.88$ at $R_\Sigma=18$ and $20$ bit/s/Hz, respectively. The active benchmark lowers BS power but incurs substantial static, switching, and amplification overhead. The proposed and strongest-greedy curves are close in this setup because their selected active sets often overlap, while the proposed ranker keeps the finite-grid search cost-aware by penalizing active noise and hardware costs.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.80\columnwidth]{fig_pareto_boundary.jpg}
-\caption{Approximated EE-SE boundary.}
+\includegraphics[width=0.98\columnwidth]{fig_pareto_boundary.eps}
+\caption{Comparison of achievable EE-SE boundaries.}
 \label{fig:pareto}
+\vspace{-1.6ex}
 \end{figure}
 
 
-Fig.~\ref{fig:noise_dyn} shows hardware sensitivity at $R_\Sigma=6$, $9$, $12$, $15$, and $18$ bit/s/Hz. A larger gain is not always beneficial: increasing $\sigma_a$ suppresses the selected gain because amplifier noise scales with $\beta_s^2$ and raises the required power. Increasing $f_u$ similarly increases switching power and reduces EE.
+Fig.~\ref{fig:noise_dyn} shows hardware sensitivity at $R_\Sigma=6$, $9$, $12$, $15$, and $18$ bit/s/Hz. A larger gain is not always beneficial: increasing $\sigma_a$ suppresses the selected gain because amplifier noise scales with $\beta_s^2$ and raises the required power, as shown in Fig.~\ref{fig:noise_dyn}(a). Increasing $f_u$ similarly increases switching power and reduces EE, as shown in Fig.~\ref{fig:noise_dyn}(b).
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.90\columnwidth]{fig_noise_dynamic.jpg}
-\caption{Hardware sensitivity versus amplifier noise and switching overhead.}
+\begin{minipage}[t]{0.49\columnwidth}
+\centering
+\includegraphics[width=\linewidth]{fig_noise_sigma.eps}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\columnwidth}
+\centering
+\includegraphics[width=\linewidth]{fig_noise_update.eps}
+\end{minipage}
+\caption{(a) Amplifier-noise sensitivity; (b) switching-overhead sensitivity.}
 \label{fig:noise_dyn}
+\vspace{-1.6ex}
 \end{figure}
-
-Fig.~\ref{fig:breakdown} compares the power distribution at $R_\Sigma=12$ and $16$ bit/s/Hz. The bars are sorted by total consumed power in descending order. Active operation reduces the BS transmit-power component but incurs large static, switching, and amplification overhead. Sparse active designs balance these terms, which explains why activating only a subset of elements is preferable to either fully passive or fully active operation.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.96\columnwidth]{fig_power_breakdown.jpg}
-\caption{Power distribution at $R_\Sigma=12$ and $16$ bit/s/Hz, sorted by total power.}
+\includegraphics[width=0.98\columnwidth]{fig_power_breakdown.eps}
+\caption{Power distribution sorted by total power: (a) $R_\Sigma=12$ bit/s/Hz; (b) $R_\Sigma=16$ bit/s/Hz.}
 \label{fig:breakdown}
+\vspace{-1.6ex}
 \end{figure}
-
-Fig.~\ref{fig:runtime_n} reports the measured runtime per boundary point as the number of STAR-RIS elements increases. The timing test is separate from MC averaging and uses the same finite-grid search structure as the boundary-generation procedure. The proposed method evaluates both cost-aware and channel-strength candidate pairs, so its runtime is higher than a single-ranker baseline but remains governed by the finite grid.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.82\columnwidth]{fig_runtime_vs_N.jpg}
-\caption{Runtime per boundary point versus the number of STAR-RIS elements.}
-\label{fig:runtime_n}
+\includegraphics[width=0.82\columnwidth]{fig_power_trace_preview.eps}
+\caption{Total power of the proposed finite candidate search.}
+\label{fig:power_trace}
+\vspace{-1.6ex}
 \end{figure}
 
-Fig.~\ref{fig:ee_runtime} shows the EE-runtime tradeoff at $R_\Sigma=12$ bit/s/Hz. The proposed design provides the largest EE among the compared scalar-model schemes in this setting, while the passive and fully active designs have lower computational cost but lower EE.
+\newpage
+Fig.~\ref{fig:breakdown} compares the power distribution at $R_\Sigma=12$ and $16$ bit/s/Hz: active elements reduce BS transmit power but add static, switching, and amplification power, so sparse activation provides the best balance. Fig.~\ref{fig:power_trace} shows the incumbent feasible total power during the finite candidate search; low-SE targets stabilize early, whereas high-SE targets need more $(L,\alpha)$ and side-assignment evaluations before the tradeoff settles.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\columnwidth]{fig_ee_runtime_tradeoff.jpg}
-\caption{EE-runtime tradeoff at $R_\Sigma=12$ bit/s/Hz.}
-\label{fig:ee_runtime}
-\end{figure}
-
+\enlargethispage{2\baselineskip}
 \section{Conclusion}
-This letter studied the EE-SE behavior of hybrid active-passive STAR-RIS under sparse active selection and gain control. The numerical results indicate that the best EE is obtained at a moderate active density: too few active elements leave a large BS transmit-power demand, whereas too many elements amplify noise and accumulate hardware power. The cost-aware selection improves the achievable EE-SE boundary by avoiding elements whose coherent-channel gain is outweighed by active-noise and hardware penalties. Since the procedure uses structured sparse activation and finite grids, the resulting curve is an achievable Pareto-frontier approximation with practical design value, rather than a certified globally optimal Pareto frontier. The power distribution further confirms that switching, bias, and gain-dependent amplifier terms are decisive in determining when active STAR-RIS operation is energy efficient. Future work will validate the design under full-dimensional beamforming and incorporate signal-dependent active-output constraints.
+This letter studied the EE-SE behavior of hybrid active-passive STAR-RIS with sparse active selection and gain control. The results show that EE is maximized at a moderate active density: too few active elements require large BS transmit power, whereas too many amplify noise and accumulate hardware power. The cost-aware ranker avoids elements whose coherent gain is outweighed by active-noise and hardware penalties, and the search trace shows that demanding SE targets require more candidate evaluations before the power tradeoff stabilizes. Future work will consider full-dimensional beamforming and signal-dependent active-output constraints.
 
+\vspace{0.4ex}
 \begingroup
-\renewcommand{\baselinestretch}{0.70}\selectfont
-\fontsize{5.2}{5.2}\selectfont
+\renewcommand{\baselinestretch}{1.0}\selectfont
+\fontsize{4.8}{5.15}\selectfont
 
 \begin{thebibliography}{99}
-\setlength{\itemsep}{0pt}
+\setlength{\itemsep}{-0.8pt}
 \setlength{\parskip}{0pt}
 
 \bibitem{wu2019irs}
@@ -453,15 +456,15 @@ Q.~Wu and R.~Zhang,
 ``Intelligent reflecting surface enhanced wireless network via joint active and passive beamforming,''
 \emph{IEEE Trans. Wireless Commun.}, vol.~18, no.~11, pp.~5394--5409, Nov.~2019.
 
-\bibitem{bjornson2020irsrelay}
-E.~Bj{\"o}rnson, {\"O}.~{\"O}zdogan, and E.~G. Larsson,
-``Intelligent reflecting surface versus decode-and-forward: How large surfaces are needed to beat relaying?,''
-\emph{IEEE Wireless Commun. Lett.}, vol.~9, no.~2, pp.~244--248, Feb.~2020.
-
 \bibitem{bjornson2020myths}
 E.~Bj{\"o}rnson, {\"O}.~{\"O}zdogan, and E.~G. Larsson,
 ``Reconfigurable intelligent surfaces: Three myths and two critical questions,''
 \emph{IEEE Commun. Mag.}, vol.~58, no.~12, pp.~90--96, Dec.~2020.
+
+\bibitem{bjornson2022signalperspective}
+E.~Bj{\"o}rnson, H.~Wymeersch, B.~Matthiesen, P.~Popovski, L.~Sanguinetti, and E.~de Carvalho,
+``Reconfigurable intelligent surfaces: A signal processing perspective with wireless applications,''
+\emph{IEEE Signal Process. Mag.}, vol.~39, no.~2, pp.~135--158, Mar.~2022.
 
 \bibitem{liu2021star}
 Y.~Liu, X.~Mu, J.~Xu, R.~Schober, Y.~Hao, H.~V. Poor, and L.~Hanzo,
@@ -493,17 +496,6 @@ A.~Huang, X.~Mu, L.~Guo, and G.~Zhu,
 ``Hybrid active-passive RIS transmitter enabled energy-efficient multi-user communications,''
 \emph{IEEE Trans. Wireless Commun.}, vol.~23, no.~9, pp.~10653--10666, Sep.~2024.
 
-\bibitem{nguyen2022hybrid}
-N.~T. Nguyen, V.-D. Nguyen, Q.~Wu, A.~T{\"o}lli, S.~Chatzinotas, and M.~Juntti,
-``Hybrid active-passive reconfigurable intelligent surface-assisted multi-user MISO systems,''
-in \emph{Proc. IEEE SPAWC}, Oulu, Finland, 2022, pp.~1--5.
-
-\bibitem{long2024poweraware}
-R.~Long, H.~Zhou, and Y.-C. Liang,
-``Power-aware sparse reflect beamforming in active RIS-aided interference channels,''
-\emph{IEEE Internet Things J.}, vol.~11, no.~22, pp.~37057--37070, Nov.~2024.
-
-
 \bibitem{zhang2022signal}
 Z.~Zhang, L.~Dai, X.~Chen, C.~Liu, F.~Yang, R.~Schober, and H.~V. Poor,
 ``Active RISs: Signal modeling, asymptotic analysis, and beamforming design,''
@@ -530,9 +522,7 @@ J.~Wang, W.~Tang, J.~C. Liang, L.~Zhang, J.~Y. Dai, X.~Li, S.~Jin, Q.~Cheng, and
 \emph{IEEE Trans. Commun.}, vol.~72, no.~9, pp.~5720--5734, Sep.~2024.
 
 \bibitem{ehrgott2005multicriteria}
-M.~Ehrgott,
-\emph{Multicriteria Optimization}, 2nd~ed.
-Berlin, Germany: Springer, 2005.
+M.~Ehrgott, \emph{Multicriteria Optimization}, 2nd~ed. Springer, 2005.
 
 \end{thebibliography}
 \endgroup

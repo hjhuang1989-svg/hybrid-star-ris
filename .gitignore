@@ -5,3 +5,15 @@ __pycache__/
 venv/
 env/
 
+# LaTeX and MATLAB-generated temporary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*-converted-to.pdf
+*.asv
+
