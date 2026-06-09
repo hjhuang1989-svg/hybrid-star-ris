@@ -2,15 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Reproducible simulator for
-"EE-SE Pareto-Frontier Approximation and Amplification Structure Optimization for
-Hybrid Active-Passive STAR-RIS"
+"Energy-Efficient Hybrid STAR-RIS via Sparse Active Selection and Gain Control"
 
 This implementation evaluates the post-ZF scalar surrogate used in the paper.
-It generates the ES / TS / SS protocol studies, feasibility probabilities,
-baseline comparisons, power breakdowns, and rate-dependent hardware-sensitivity
-curves reported in the manuscript. The active baseline uses
-the same power-minimizing gain update as the proposed scheme; a gain-saturated
-active benchmark is intentionally not mixed into the main comparison.
+It generates the energy-splitting (ES) boundary study, feasibility probabilities,
+baseline comparisons, power distributions, and hardware-sensitivity curves
+reported in the manuscript. The active baseline uses the same power-minimizing
+gain update as the proposed scheme; a gain-saturated active benchmark is
+intentionally not mixed into the main comparison.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -49,8 +47,6 @@ class SimConfig:
 
     rho_t: float = 0.55
     rho_r: float = 0.45
-    tau_t: float = 0.55
-    tau_r: float = 0.45
     beta_max: float = 5.0
 
     sigma0: float = 0.25
@@ -114,7 +110,7 @@ def runtime_environment(cfg: SimConfig) -> Dict[str, object]:
         "numpy": np.__version__,
         "matplotlib": matplotlib.__version__,
         "num_workers": int(cfg.num_workers),
-        "seed_policy": f"integer seeds 1..{cfg.num_mc}",
+        "mc_realizations": int(cfg.num_mc),
     }
 
 
@@ -147,20 +143,16 @@ def generate_channels(cfg: SimConfig, seed: int) -> Tuple[np.ndarray, np.ndarray
 # Protocols and weighting rules
 # =========================
 def protocol_rho_tau(protocol: str, cfg: SimConfig) -> Tuple[Tuple[float, float], Tuple[float, float]]:
-    """Return effective splitting coefficients and time fractions for ES/TS/SS."""
+    """Return effective splitting coefficients and time weights for the ES protocol."""
 
     mode = protocol.upper()
-    if mode == "ES":
-        return (cfg.rho_t, cfg.rho_r), (1.0, 1.0)
-    if mode == "TS":
-        return (1.0, 1.0), (cfg.tau_t, cfg.tau_r)
-    if mode == "SS":
-        return (1.0, 1.0), (1.0, 1.0)
-    raise ValueError(f"Unsupported protocol: {protocol}")
+    if mode != "ES":
+        raise ValueError(f"Unsupported protocol in the ES-focused script: {protocol}")
+    return (cfg.rho_t, cfg.rho_r), (1.0, 1.0)
 
 
 def side_rate_weights(alpha: float) -> Tuple[float, float]:
-    """Convert the sum-rate split alpha into rate-split weights."""
+    """Convert the sum-rate splitting variable alpha into side-rate weights."""
 
     eps = 1e-6
     return float(max(alpha, eps)), float(max(1.0 - alpha, eps))
@@ -223,7 +215,7 @@ def build_strongest_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray,
     """Build a channel-strength-only greedy baseline.
 
     This baseline uses the same L/alpha grid as the proposed method but ranks
-    elements only by rate-split-weighted coherent gain.  It deliberately
+    elements only by side-rate-weighted coherent gain.  It deliberately
     ignores amplifier-noise, bias, and switching costs.
     """
 
@@ -246,7 +238,7 @@ def _random_baseline_seed(g: np.ndarray, L: int, alpha: float, repeat: int, prot
 
     # The hash depends on the channel realization and design point, keeping the
     # random baseline reproducible without passing a separate seed through the
-    # solver interface.
+    # boundary-search interface.
     vals = np.round(np.abs(g[: min(8, len(g))]) * 1e9).astype(np.uint64)
     modulus = 2**64
     acc = 1469598103934665603
@@ -263,8 +255,8 @@ def build_random_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, L:
 
     The support is random, while each selected element is assigned to the side
     where it has the larger cost-aware score.  The default configuration uses
-    one random repetition (Q_rand=1), so this is a lightweight sanity baseline
-    rather than a heavily optimized random search.
+    one random repetition, so this is a lightweight sanity baseline rather than
+    a heavily optimized random search.
     """
 
     if L <= 0:
@@ -277,28 +269,6 @@ def build_random_active_sets(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, L:
     xi_r = eq23_side_score(g, h_r, weight_r, rho_r_eff, cfg)
     best_side = np.where(xi_t[selected] >= xi_r[selected], 0, 1)
     return np.sort(selected[best_side == 0]), np.sort(selected[best_side == 1])
-
-
-def build_ss_subsurfaces(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, A_t: np.ndarray, A_r: np.ndarray, alpha: float) -> Dict[str, np.ndarray]:
-    """Construct transmission and reflection subsurfaces for the SS protocol.
-
-    Under SS, each passive element belongs to only one side.  Non-active
-    elements are therefore assigned according to the rate-split-weighted link
-    strength, yielding complete subsurfaces S_t and S_r.
-    """
-
-    abs_g = np.abs(g)
-    weight_t, weight_r = side_rate_weights(alpha)
-    pi_t = weight_t * abs_g * np.min(np.abs(h_t), axis=0)
-    pi_r = weight_r * abs_g * np.min(np.abs(h_r), axis=0)
-    all_idx = np.arange(len(g))
-    active_union = np.union1d(A_t, A_r)
-    passive = np.setdiff1d(all_idx, active_union)
-    P_t = np.sort(passive[pi_t[passive] >= pi_r[passive]])
-    P_r = np.sort(passive[pi_t[passive] < pi_r[passive]])
-    S_t = np.sort(np.union1d(P_t, A_t))
-    S_r = np.sort(np.union1d(P_r, A_r))
-    return {"P_t": P_t, "P_r": P_r, "S_t": S_t, "S_r": S_r}
 
 
 def side_params(g: np.ndarray, h_side: np.ndarray, passive_idx: np.ndarray, active_idx: np.ndarray, rho_eff: float, sigma0: float, sigma_amp: float) -> Tuple[float, float, float, float]:
@@ -439,22 +409,17 @@ def side_required_power(g: np.ndarray, h_side: np.ndarray, passive_idx: np.ndarr
 
 
 def protocol_total_power(P_t_req: float, P_r_req: float, Lt: int, Lr: int, beta_t: float, beta_r: float, cfg: SimConfig, protocol: str) -> Tuple[float, float, float, Dict[str, float]]:
-    """Aggregate total power and return static, dynamic, BS, and amplifier parts."""
+    """Aggregate ES total power and return static, dynamic, BS, and amplifier parts."""
 
+    mode = protocol.upper()
+    if mode != "ES":
+        raise ValueError(f"Unsupported protocol in the ES-focused script: {protocol}")
     static = cfg.P_ctrl + cfg.P_bias * (Lt + Lr)
     dynamic = cfg.f_update * (cfg.E_sw_base + cfg.E_sw_act * (Lt + Lr))
-    mode = protocol.upper()
-    if mode == "TS":
-        tau_t, tau_r = cfg.tau_t, cfg.tau_r
-        Ptx_avg = tau_t * P_t_req + tau_r * P_r_req
-        Ptx_peak = max(P_t_req, P_r_req)
-        bs = Ptx_avg / cfg.eta_pa
-        amp = cfg.P_amp * (tau_t * Lt * max(beta_t ** 2 - 1.0, 0.0) + tau_r * Lr * max(beta_r ** 2 - 1.0, 0.0))
-    else:
-        Ptx_avg = P_t_req + P_r_req
-        Ptx_peak = Ptx_avg
-        bs = Ptx_avg / cfg.eta_pa
-        amp = cfg.P_amp * (Lt * max(beta_t ** 2 - 1.0, 0.0) + Lr * max(beta_r ** 2 - 1.0, 0.0))
+    Ptx_avg = P_t_req + P_r_req
+    Ptx_peak = Ptx_avg
+    bs = Ptx_avg / cfg.eta_pa
+    amp = cfg.P_amp * (Lt * max(beta_t ** 2 - 1.0, 0.0) + Lr * max(beta_r ** 2 - 1.0, 0.0))
     Ptot = static + dynamic + bs + amp
     return Ptot, Ptx_avg, Ptx_peak, {"static": static, "dynamic": dynamic, "bs": bs, "amp": amp}
 
@@ -463,51 +428,56 @@ def protocol_total_power(P_t_req: float, P_r_req: float, Lt: int, Lr: int, beta_
 # Candidate evaluation and boundary-point search
 # =========================
 def evaluate_candidate(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, A_t: np.ndarray, A_r: np.ndarray, Rtarget: float, alpha: float, cfg: SimConfig, protocol: str = "ES") -> Optional[Dict[str, float]]:
-    """Evaluate one active-set split at a target sum-SE.
+    """Evaluate one ES active-set split at a target sum-SE.
 
-    The inputs are fixed active sets A_t/A_r and a side-rate split alpha.  The
-    output includes total power, transmit power, optimized common gains, and
+    The inputs are fixed active sets A_t/A_r and a side-rate splitting variable alpha.  The
+    output includes total power, transmit power, optimized side-wise gains, and
     power breakdown.  If the peak BS power exceeds the budget, ``None`` is
     returned.
     """
 
+    mode = protocol.upper()
+    if mode != "ES":
+        raise ValueError(f"Unsupported protocol in the ES-focused script: {protocol}")
     if np.intersect1d(A_t, A_r).size > 0:
         raise ValueError("Transmission and reflection active sets must be disjoint.")
     Rt = alpha * Rtarget
     Rr = (1.0 - alpha) * Rtarget
-    (rho_t_eff, rho_r_eff), (tau_t, tau_r) = protocol_rho_tau(protocol, cfg)
-    mode = protocol.upper()
-    if mode == "SS":
-        ss_sets = build_ss_subsurfaces(g, h_t, h_r, A_t, A_r, alpha)
-        passive_t = ss_sets["P_t"]
-        passive_r = ss_sets["P_r"]
-    else:
-        ss_sets = None
-        passive_t = np.setdiff1d(np.arange(cfg.N), A_t)
-        passive_r = np.setdiff1d(np.arange(cfg.N), A_r)
+    (rho_t_eff, rho_r_eff), _ = protocol_rho_tau(mode, cfg)
+    passive_t = np.setdiff1d(np.arange(cfg.N), A_t)
+    passive_r = np.setdiff1d(np.arange(cfg.N), A_r)
     a_t, b_t, c_t, d_t = side_params(g, h_t, passive_t, A_t, rho_t_eff, cfg.sigma0, cfg.sigma_amp)
     a_r, b_r, c_r, d_r = side_params(g, h_r, passive_r, A_r, rho_r_eff, cfg.sigma0, cfg.sigma_amp)
-    if mode == "TS":
-        Rt_eff = Rt / tau_t
-        Rr_eff = Rr / tau_r
-    else:
-        Rt_eff = Rt
-        Rr_eff = Rr
-    beta_t = minimize_beta_power(a_t, b_t, c_t, d_t, Rt_eff, cfg.Kt, len(A_t), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
-    beta_r = minimize_beta_power(a_r, b_r, c_r, d_r, Rr_eff, cfg.Kr, len(A_r), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
+    beta_t = minimize_beta_power(a_t, b_t, c_t, d_t, Rt, cfg.Kt, len(A_t), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
+    beta_r = minimize_beta_power(a_r, b_r, c_r, d_r, Rr, cfg.Kr, len(A_r), cfg.P_amp, cfg.eta_pa, cfg.beta_max)
     if not (1.0 <= beta_t <= cfg.beta_max and 1.0 <= beta_r <= cfg.beta_max):
         raise ValueError("Optimized gains must remain inside [1, beta_max].")
-    P_t = side_required_power(g, h_t, passive_t, A_t, beta_t, Rt_eff, rho_t_eff, cfg.sigma0, cfg.sigma_amp)
-    P_r = side_required_power(g, h_r, passive_r, A_r, beta_r, Rr_eff, rho_r_eff, cfg.sigma0, cfg.sigma_amp)
+    P_t = side_required_power(g, h_t, passive_t, A_t, beta_t, Rt, rho_t_eff, cfg.sigma0, cfg.sigma_amp)
+    P_r = side_required_power(g, h_r, passive_r, A_r, beta_r, Rr, rho_r_eff, cfg.sigma0, cfg.sigma_amp)
     Ptot, Ptx_avg, Ptx_peak, breakdown = protocol_total_power(P_t, P_r, len(A_t), len(A_r), beta_t, beta_r, cfg, mode)
     if Ptx_peak > cfg.Ptx_max:
         return None
     EE = Rtarget / Ptot
-    out = {"R": float(Rtarget), "EE": float(EE), "Ptx": float(Ptx_avg), "Ptx_peak": float(Ptx_peak), "Ptot": float(Ptot), "Lt": int(len(A_t)), "Lr": int(len(A_r)), "L": int(len(A_t) + len(A_r)), "beta_t": float(beta_t), "beta_r": float(beta_r), "beta_avg": float(0.5 * (beta_t + beta_r)), "alpha": float(alpha), "protocol": mode}
+    out = {
+        "R": float(Rtarget),
+        "EE": float(EE),
+        "Ptx": float(Ptx_avg),
+        "Ptx_peak": float(Ptx_peak),
+        "Ptot": float(Ptot),
+        "Lt": int(len(A_t)),
+        "Lr": int(len(A_r)),
+        "L": int(len(A_t) + len(A_r)),
+        "A_t": [int(i) for i in A_t.tolist()],
+        "A_r": [int(i) for i in A_r.tolist()],
+        "beta_t": float(beta_t),
+        "beta_r": float(beta_r),
+        "beta_avg": float(0.5 * (beta_t + beta_r)),
+        "alpha": float(alpha),
+        "Rt": float(Rt),
+        "Rr": float(Rr),
+        "protocol": mode,
+    }
     out.update(breakdown)
-    if ss_sets is not None:
-        out["surface_t"] = int(len(ss_sets["S_t"]))
-        out["surface_r"] = int(len(ss_sets["S_r"]))
     return out
 
 
@@ -515,13 +485,13 @@ def solve_boundary_point(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, Rtarge
     """Search the minimum-power point for a scheme at a fixed target SE.
 
     The search variables are the total active-cardinality L, the side-rate
-    split alpha, and the active-element assignment rule determined by the
+    splitting variable alpha, and the active-element assignment rule determined by the
     selected scheme.  The feasible candidate with the smallest total power is
     retained.
     """
 
     N = len(g)
-    best: Optional[Dict[str, float]] = None
+    selected_candidate: Optional[Dict[str, float]] = None
     if scheme == "passive":
         L_candidates = [0]
     elif scheme == "active":
@@ -548,7 +518,7 @@ def solve_boundary_point(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, Rtarge
                 elif scheme == "strongest":
                     A_t, A_r = build_strongest_active_sets(g, h_t, h_r, L, alpha, cfg, protocol)
                 elif scheme == "proposed":
-                    # The proposed sparse solver evaluates two candidate
+                    # The proposed sparse selection rule evaluates two candidate
                     # ranking rules: the cost-aware score and its
                     # channel-strength-only counterpart.  The final choice is
                     # made by the same surrogate feasibility and total-power
@@ -561,17 +531,17 @@ def solve_boundary_point(g: np.ndarray, h_t: np.ndarray, h_r: np.ndarray, Rtarge
                         res = evaluate_candidate(g, h_t, h_r, A_t_pool, A_r_pool, Rtarget, alpha, cfg, protocol)
                         if res is None:
                             continue
-                        if best is None or res["Ptot"] < best["Ptot"]:
-                            best = res
+                        if selected_candidate is None or res["Ptot"] < selected_candidate["Ptot"]:
+                            selected_candidate = res
                     continue
                 else:
                     A_t, A_r = build_active_sets(g, h_t, h_r, L, alpha, cfg, protocol)
                 res = evaluate_candidate(g, h_t, h_r, A_t, A_r, Rtarget, alpha, cfg, protocol)
                 if res is None:
                     continue
-                if best is None or res["Ptot"] < best["Ptot"]:
-                    best = res
-    return best
+                if selected_candidate is None or res["Ptot"] < selected_candidate["Ptot"]:
+                    selected_candidate = res
+    return selected_candidate
 
 
 # =========================
@@ -606,6 +576,30 @@ def _proposed_fixed_rate_indexed_worker(args: Tuple[int, int, SimConfig, float, 
     idx, seed, cfg, Rtarget, protocol = args
     g, h_t, h_r = generate_channels(cfg, seed=seed)
     return idx, solve_boundary_point(g, h_t, h_r, Rtarget, cfg, "proposed", protocol)
+
+
+def _proposed_power_trace_worker(args: Tuple[int, SimConfig, float, str]) -> List[Optional[float]]:
+    """Return the best-so-far proposed-search total-power trace for one channel."""
+
+    seed, cfg, Rtarget, protocol = args
+    g, h_t, h_r = generate_channels(cfg, seed=seed)
+    n_elem = len(g)
+    l_candidates = list(range(0, n_elem + 1, cfg.L_step))
+
+    trace: List[Optional[float]] = []
+    best = np.inf
+    for alpha in cfg.split_grid:
+        for active_count in l_candidates:
+            candidate_sets = (
+                build_active_sets(g, h_t, h_r, active_count, alpha, cfg, protocol),
+                build_strongest_active_sets(g, h_t, h_r, active_count, alpha, cfg, protocol),
+            )
+            for a_t, a_r in candidate_sets:
+                res = evaluate_candidate(g, h_t, h_r, a_t, a_r, Rtarget, alpha, cfg, protocol)
+                if res is not None and float(res["Ptot"]) < best:
+                    best = float(res["Ptot"])
+                trace.append(None if not np.isfinite(best) else float(best))
+    return trace
 
 
 def _ordered_parallel_map(func, tasks: List[Tuple], max_workers: int) -> List:
@@ -658,6 +652,60 @@ def average_boundary(cfg: SimConfig, protocol: str = "ES", schemes: Tuple[str, .
             pts.append(entry)
         avg[scheme] = pts
     return avg, raw
+
+
+def _nan_percentile_columns(trace_mat: np.ndarray, percentile: float) -> np.ndarray:
+    """Column-wise nanpercentile without all-NaN slice warnings."""
+
+    out = np.full(trace_mat.shape[1], np.nan, dtype=float)
+    for idx in range(trace_mat.shape[1]):
+        col = trace_mat[:, idx]
+        col = col[np.isfinite(col)]
+        if col.size:
+            out[idx] = float(np.percentile(col, percentile))
+    return out
+
+
+def _json_float_series(values: Sequence[float]) -> List[Optional[float]]:
+    """Convert finite floats to JSON-safe values and non-finite entries to null."""
+
+    out: List[Optional[float]] = []
+    for value in values:
+        val = float(value)
+        out.append(val if np.isfinite(val) else None)
+    return out
+
+
+def power_trace_by_rate(cfg: SimConfig, r_targets: Sequence[float] = (4.0, 8.0, 12.0, 16.0, 20.0), protocol: str = "ES") -> Dict[str, Dict[str, object]]:
+    """Return median and interquartile best-so-far total-power traces by SE target."""
+
+    seeds = list(range(1, cfg.num_mc + 1))
+    max_workers = max(1, min(int(cfg.num_workers), cfg.num_mc))
+    out: Dict[str, Dict[str, object]] = {}
+    for r_target in r_targets:
+        tasks = [(seed, cfg, float(r_target), protocol) for seed in seeds]
+        traces = _ordered_parallel_map(_proposed_power_trace_worker, tasks, max_workers)
+        if not traces:
+            continue
+        trace_mat = np.asarray(
+            [[np.nan if value is None else float(value) for value in trace] for trace in traces],
+            dtype=float,
+        )
+        median = _nan_percentile_columns(trace_mat, 50)
+        q25 = _nan_percentile_columns(trace_mat, 25)
+        q75 = _nan_percentile_columns(trace_mat, 75)
+        candidate_index = np.arange(1, trace_mat.shape[1] + 1, dtype=int)
+        key = str(int(r_target)) if float(r_target).is_integer() else str(float(r_target))
+        out[key] = {
+            "R": float(r_target),
+            "protocol": protocol.upper(),
+            "num_mc": int(cfg.num_mc),
+            "candidate_index": [int(x) for x in candidate_index.tolist()],
+            "median": _json_float_series(median),
+            "q25": _json_float_series(q25),
+            "q75": _json_float_series(q75),
+        }
+    return out
 
 
 def proposed_fixed_rate_samples(cfg: SimConfig, Rtarget: float, protocol: str) -> List[Dict[str, float]]:
@@ -776,26 +824,6 @@ SCHEME_LABELS = {
 }
 
 SCHEME_ORDER = ("passive", "uniform", "uniform_opt", "random", "strongest", "active", "proposed")
-
-
-def complexity_summary(cfg: SimConfig) -> Dict[str, Dict[str, str]]:
-    """Return the symbolic per-boundary-point complexity reported in the paper."""
-
-    G = "|G_alpha|"
-    L = "|L|"
-    Qb = "Q_beta"
-    Qr = "Q_rand"
-    NK = "N(K_t+K_r)"
-    rank = "N log N"
-    return {
-        "passive": {"search_size": G, "ranking": "0", "dominant_order": f"O({G}({NK}+{Qb}))"},
-        "uniform": {"search_size": G, "ranking": "0", "dominant_order": f"O({G}({NK}+{Qb}))"},
-        "uniform_opt": {"search_size": f"{L}{G}", "ranking": "0", "dominant_order": f"O({L}{G}({NK}+{Qb}))"},
-        "random": {"search_size": f"{Qr}{L}{G}", "ranking": "0", "dominant_order": f"O({Qr}{L}{G}({NK}+{Qb}))"},
-        "strongest": {"search_size": f"{L}{G}", "ranking": rank, "dominant_order": f"O({L}{G}({rank}+{NK}+{Qb}))"},
-        "active": {"search_size": G, "ranking": rank, "dominant_order": f"O({G}({rank}+{NK}+{Qb}))"},
-        "proposed": {"search_size": f"2{L}{G}", "ranking": rank, "dominant_order": f"O({L}{G}({rank}+{NK}+{Qb}))"},
-    }
 
 
 def feasibility_table(avg: Dict[str, List[Optional[Dict[str, float]]]], rates: Sequence[int] = (12, 18, 20)) -> Dict[str, Dict[str, float]]:
@@ -918,218 +946,9 @@ def fairness_audit_proposed_vs_strongest(raw: Dict[str, List[List[Optional[Dict[
         raise RuntimeError(f"Fairness audit failed: {violations}")
     return {"checked_pairs": int(checked_pairs), "violations": 0, "worst_power_excess": float(worst_excess)}
 
-
-def random_audit_summary(cfg: SimConfig, avg_es: Dict[str, List[Optional[Dict[str, float]]]], protocol: str = "ES", q_rand: int = 20) -> Tuple[Dict[str, object], Dict[str, object]]:
-    """Run and summarize a stronger random-search audit outside the main plots."""
-
-    audit_cfg = SimConfig(**asdict(cfg))
-    audit_cfg.random_repeats = int(q_rand)
-    avg_random, raw_random = average_boundary(audit_cfg, protocol=protocol, schemes=("random",))
-    validation = validate_raw_outputs(audit_cfg, raw_random, f"{protocol.upper()} random Q{q_rand}")
-    prop_r12 = point_at_rate(avg_es["proposed"], 12)
-    rand_r12 = point_at_rate(avg_random["random"], 12)
-    stability = {
-        "rate": 12,
-        "proposed_EE": None if prop_r12 is None else float(prop_r12["EE"]),
-        "random_q20_EE": None if rand_r12 is None else float(rand_r12["EE"]),
-        "proposed_minus_random_q20_EE": None if prop_r12 is None or rand_r12 is None else float(prop_r12["EE"] - rand_r12["EE"]),
-        "supports_main_R12_claim": bool(prop_r12 is not None and rand_r12 is not None and prop_r12["EE"] > rand_r12["EE"]),
-    }
-    audit = {
-        "protocol": protocol.upper(),
-        "q_rand": int(q_rand),
-        "config_overrides": {"random_repeats": int(q_rand), "num_mc": int(audit_cfg.num_mc), "seeds": f"1..{audit_cfg.num_mc}"},
-        "average_boundary_random": avg_random["random"],
-        "representative_R12_metrics": representative_metrics(avg_random, rate=12).get("random"),
-        "feasibility_probability": feasibility_table(avg_random, rates=(12, 18, 20)).get("random"),
-        "stability_check": stability,
-        "validation": validation,
-    }
-    return audit, {"raw_random": raw_random}
-
-
-# =========================
-# Plotting
-# =========================
-def style() -> None:
-    """Set a consistent plotting style for manuscript figures."""
-
-    plt.rcParams.update({"font.size": 10, "axes.grid": True, "grid.alpha": 0.25, "figure.dpi": 150, "savefig.dpi": 220, "lines.linewidth": 2.0})
-
-
-def save_manuscript_figure(fig: plt.Figure, out_dir: Path, stem: str) -> None:
-    """Save a figure in PNG and JPG formats."""
-
-    fig.savefig(out_dir / f"{stem}.png", bbox_inches="tight")
-    fig.savefig(out_dir / f"{stem}.jpg", bbox_inches="tight", dpi=220)
-
-
-def plot_pareto(avg: Dict[str, List[Optional[Dict[str, float]]]], out_dir: Path) -> None:
-    """Plot the approximated EE-SE frontier for the ES protocol."""
-
-    fig, ax = plt.subplots(figsize=(7.2, 4.8))
-    markers = {
-        "passive": "o",
-        "uniform": "s",
-        "uniform_opt": "v",
-        "random": "P",
-        "strongest": "X",
-        "active": "^",
-        "proposed": "D",
-    }
-    for scheme in SCHEME_ORDER:
-        if scheme not in avg:
-            continue
-        pts = [p for p in avg[scheme] if p is not None]
-        if not pts:
-            continue
-        ax.plot([p["R"] for p in pts], [p["EE"] for p in pts], marker=markers[scheme], label=SCHEME_LABELS[scheme])
-        # Hollow markers identify conditional averages with clearly non-unity feasibility.
-        outage_pts = [p for p in pts if p.get("feas_prob", 1.0) < 0.995]
-        if outage_pts:
-            ax.plot(
-                [p["R"] for p in outage_pts],
-                [p["EE"] for p in outage_pts],
-                linestyle="None",
-                marker=markers[scheme],
-                markerfacecolor="none",
-                markeredgewidth=1.3,
-            )
-            if scheme == "passive":
-                for p in outage_pts:
-                    label_offset = (-35, 7) if p["R"] >= max(q["R"] for q in pts) else (3, 7)
-                    ax.annotate(
-                        f"$p_f={p.get('feas_prob', 1.0):.2f}$",
-                        (p["R"], p["EE"]),
-                        textcoords="offset points",
-                        xytext=label_offset,
-                        fontsize=7,
-                    )
-    ax.set_xlabel("Sum spectral efficiency (bit/s/Hz)")
-    ax.set_ylabel("Normalized energy efficiency (bit/J/Hz)")
-    ax.legend(frameon=True, fontsize=7, ncol=2)
-    fig.tight_layout()
-    save_manuscript_figure(fig, out_dir, "fig_pareto_boundary")
-    plt.close(fig)
-
-
-def plot_design_rules(protocol_boundary: Dict[str, List[Optional[Dict[str, float]]]], cfg: SimConfig, out_dir: Path) -> None:
-    """Plot active-ratio and side-wise-gain rules for ES/TS/SS."""
-
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.6))
-    all_rates = sorted({float(p["R"]) for pts in protocol_boundary.values() for p in pts if p is not None})
-    for protocol, marker in [("ES", "o"), ("TS", "s"), ("SS", "D")]:
-        pts = [p for p in protocol_boundary[protocol] if p is not None]
-        axes[0].plot([p["R"] for p in pts], [p["L"] / cfg.N for p in pts], marker=marker, label=protocol)
-    if all_rates:
-        axes[0].plot(all_rates, [cfg.L_uniform / cfg.N] * len(all_rates), linestyle="--", linewidth=1.5, label=rf"Fixed $L={cfg.L_uniform}$")
-        axes[0].plot(all_rates, [1.0] * len(all_rates), linestyle=":", linewidth=1.5, label="Active")
-    axes[0].set_xlabel("Target sum-SE (bit/s/Hz)")
-    axes[0].set_ylabel("Active ratio")
-    axes[0].set_ylim(0.0, 1.05)
-    axes[0].legend(frameon=True, fontsize=7, ncol=2)
-    style_map = {"ES": ("o", "-"), "TS": ("s", "--"), "SS": ("D", ":")}
-    for protocol in ["ES", "TS", "SS"]:
-        pts = [p for p in protocol_boundary[protocol] if p is not None]
-        marker, linestyle = style_map[protocol]
-        axes[1].plot([p["R"] for p in pts], [p["beta_t"] for p in pts], marker=marker, linestyle=linestyle, label=rf"{protocol} $\beta_t^\star$")
-        axes[1].plot([p["R"] for p in pts], [p["beta_r"] for p in pts], marker=marker, linestyle=(0, (1, 1)), label=rf"{protocol} $\beta_r^\star$")
-    axes[1].set_xlabel("Target sum-SE (bit/s/Hz)")
-    axes[1].set_ylabel("Side-wise gain")
-    axes[1].set_ylim(1.0, cfg.beta_max + 0.2)
-    axes[1].legend(frameon=True, fontsize=7, ncol=2)
-    fig.tight_layout()
-    save_manuscript_figure(fig, out_dir, "fig_design_rules")
-    plt.close(fig)
-
-
-def plot_noise_and_dynamics(noise_by_rate: Dict[str, List[Dict[str, float]]], dyn_by_rate: Dict[str, List[Dict[str, float]]], out_dir: Path) -> None:
-    """Plot ES hardware sensitivity at several target sum-SE levels.
-
-    The three target rates are shown together to highlight that larger active
-    gain is not always beneficial. A higher target can require more coherent
-    gain, but amplifier noise and switching overhead may make the EE-optimal
-    gain smaller than the gain selected at a lower target.
-    """
-
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.6))
-    markers = {"6": "o", "9": "^", "12": "s", "15": "v", "18": "D"}
-    rate_order = tuple(str(r) for r in sorted((int(k) for k in noise_by_rate.keys()), key=int))
-    for rate in rate_order:
-        noise = noise_by_rate[rate]
-        label = rf"$R_\Sigma={rate}$"
-        axes[0].plot(
-            [d["sigma_amp"] for d in noise],
-            [np.nan if d["beta_avg"] is None else d["beta_avg"] for d in noise],
-            marker=markers[rate],
-            label=label,
-        )
-        dyn = dyn_by_rate[rate]
-        axes[1].plot(
-            [d["f_update"] for d in dyn],
-            [np.nan if d["EE"] is None else d["EE"] for d in dyn],
-            marker=markers[rate],
-            label=label,
-        )
-    axes[0].set_xlabel(r"Amplifier-noise std. $\sigma_a$")
-    axes[0].set_ylabel("Average side-wise gain")
-    axes[0].legend(frameon=True, fontsize=7, ncol=2)
-    axes[1].set_xlabel("Update frequency (Hz)")
-    axes[1].set_ylabel("Normalized EE (bit/J/Hz)")
-    axes[1].legend(frameon=True, fontsize=7, ncol=2)
-    fig.tight_layout()
-    save_manuscript_figure(fig, out_dir, "fig_noise_dynamic")
-    plt.close(fig)
-
-def plot_power_breakdown(breakdown_map: Dict[int, Dict[str, Dict[str, float]]], out_dir: Path) -> None:
-    """Plot stacked power breakdowns for representative target-rate points."""
-
-    rates = [12, 16]
-    short_labels = {
-        "passive": "Pass.",
-        "uniform": "F.-unif.",
-        "uniform_opt": "Opt.-unif.",
-        "random": "Rand.",
-        "strongest": "Strong.",
-        "active": "Active",
-        "proposed": "Prop.",
-    }
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 2.85), sharey=False)
-    legend_handles = None
-    legend_labels = None
-    for ax, rate in zip(axes, rates):
-        breakdown = breakdown_map[rate]
-        schemes = [s for s in SCHEME_ORDER if s in breakdown]
-        static = np.array([breakdown[s]["static"] for s in schemes])
-        dynamic = np.array([breakdown[s]["dynamic"] for s in schemes])
-        bs = np.array([breakdown[s]["bs"] for s in schemes])
-        amp = np.array([breakdown[s]["amp"] for s in schemes])
-        total = static + dynamic + bs + amp
-        x = np.arange(len(schemes))
-        ax.bar(x, static, label="Static")
-        ax.bar(x, dynamic, bottom=static, label="Dynamic")
-        ax.bar(x, bs, bottom=static + dynamic, label="BS transmit")
-        ax.bar(x, amp, bottom=static + dynamic + bs, label="Amplification")
-        ax.set_xticks(x)
-        ax.set_xticklabels([short_labels[s] for s in schemes], rotation=22, ha="right", fontsize=7)
-        ax.set_title(rf"$R_\Sigma={rate}$ bit/s/Hz", fontsize=9)
-        ax.set_ylim(0.0, 1.35 * float(np.max(total)))
-        ax.set_ylabel("Power (W)")
-        if legend_handles is None:
-            legend_handles, legend_labels = ax.get_legend_handles_labels()
-    axes[0].legend(legend_handles[:2], legend_labels[:2], loc="upper center", ncol=2, frameon=True, fontsize=6.5)
-    axes[1].legend(legend_handles[2:], legend_labels[2:], loc="upper center", ncol=2, frameon=True, fontsize=6.5)
-    fig.tight_layout(pad=0.35)
-    save_manuscript_figure(fig, out_dir, "fig_power_breakdown")
-    plt.close(fig)
-
-
-
-
 def main() -> None:
     """Run all reproducibility experiments and write figures/JSON results."""
 
-    style()
     base_dir = Path(__file__).resolve().parents[1]
     fig_dir = base_dir / "figs"
     results_dir = base_dir / "results"
@@ -1153,13 +972,6 @@ def main() -> None:
     breakdown_es_12 = average_breakdown_for_R(cfg, raw_es, Rtarget=12)
     breakdown_es_16 = average_breakdown_for_R(cfg, raw_es, Rtarget=16)
 
-    protocol_boundary: Dict[str, List[Optional[Dict[str, float]]]] = {"ES": avg_es["proposed"]}
-    for protocol in ("TS", "SS"):
-        t0 = time.perf_counter()
-        avg_p, raw_p = average_boundary(cfg, protocol=protocol, schemes=("proposed",))
-        timings[f"average_boundary_{protocol.lower()}_proposed_seconds"] = time.perf_counter() - t0
-        validations[f"average_boundary_{protocol.lower()}_proposed"] = validate_raw_outputs(cfg, raw_p, f"{protocol} proposed boundary")
-        protocol_boundary[protocol] = avg_p["proposed"]
 
     sigmas = np.linspace(0.02, 0.18, 9)
     f_updates = np.arange(50, 551, 50)
@@ -1175,39 +987,35 @@ def main() -> None:
         es_dyn_by_rate[key] = sweep_update_frequency(f_updates, cfg, Rtarget=float(R), protocol="ES")
         timings[f"dynamic_sweep_es_R{R}_seconds"] = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    random_audit_es_q20, _ = random_audit_summary(cfg, avg_es, protocol="ES", q_rand=20)
-    timings["random_audit_es_q20_seconds"] = time.perf_counter() - t0
-
     reliability_blockers = []
-    if not random_audit_es_q20["stability_check"]["supports_main_R12_claim"]:
-        reliability_blockers.append("Q_rand=20 random audit does not leave the proposed design above random at R=12.")
 
-    plot_pareto(avg_es, fig_dir)
-    plot_design_rules(protocol_boundary, cfg, fig_dir)
-    plot_noise_and_dynamics(es_noise_by_rate, es_dyn_by_rate, fig_dir)
-    plot_power_breakdown({12: breakdown_es_12, 16: breakdown_es_16}, fig_dir)
+    t0 = time.perf_counter()
+    trace_by_rate = power_trace_by_rate(cfg, r_targets=(4.0, 8.0, 12.0, 16.0, 20.0), protocol="ES")
+    timings["power_trace_es_seconds"] = time.perf_counter() - t0
+
     summary = {
-        "result_schema": "hybrid_star_ris_mc10000_reliability",
+        "result_schema": "hybrid_star_ris_es_mc10000_python_eps",
         "config": {**asdict(cfg), "lambda1_effective": eq23_weights(cfg)[0], "lambda2_effective": eq23_weights(cfg)[1]},
         "runtime_environment": runtime_environment(cfg),
+        "timings_seconds": timings,
         "scheme_order": list(SCHEME_ORDER),
         "scheme_labels": SCHEME_LABELS,
         "average_boundary_es": avg_es,
         "representative_R12_metrics_es": representative_metrics(avg_es, rate=12),
         "feasibility_probability_es": feasibility_table(avg_es, rates=(12, 18, 20)),
-        "protocol_design_rules": protocol_boundary,
         "es_noise_sweep_by_rate": es_noise_by_rate,
         "es_dynamic_sweep_by_rate": es_dyn_by_rate,
         "power_breakdown_at_R12_es": breakdown_es_12,
         "power_breakdown_at_R16_es": breakdown_es_16,
-        "random_audit_es_q20": random_audit_es_q20,
+        "power_trace_by_rate": trace_by_rate,
         "validations": validations,
         "reliability_blockers": reliability_blockers,
-        "complexity_summary": complexity_summary(cfg),
     }
     with open(result_json, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
+    from plot_hybrid_star_ris_eps import plot_from_json
+
+    plot_from_json(result_json, fig_dir)
     print("Simulation completed.")
     print(f"Figures saved under: {fig_dir}")
     print(f"Summary JSON: {result_json}")
